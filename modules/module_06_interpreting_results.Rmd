@@ -1,0 +1,368 @@
+---
+title: "Module 6: Interpreting ExWAS Results"
+subtitle: "Conducting Exposome-Wide Association Studies"
+author: "Chirag J Patel"
+output:
+  ioslides_presentation:
+    widescreen: true
+    smaller: true
+    css: styles.css
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, eval = FALSE)
+library(tidyverse)
+library(broom)
+library(survey)
+library(knitr)
+library(kableExtra)
+library(ggrepel)
+```
+
+## Overview
+
+In this module, we learn to interpret ExWAS results:
+
+1. Volcano plots
+2. Effect size interpretation
+3. Delta R-squared visualization
+4. Replication analysis tables
+5. Exposure correlation heatmap
+6. Sensitivity across adjustment scenarios
+7. Association vs. causation
+8. Caveats: reverse causation, selection bias, measurement error
+9. The PE Atlas and STROBE-E reporting
+
+## Setting Up: Loading Results
+
+We assume you have ExWAS results from Module 5:
+
+```{r load-results}
+# Load pre-computed results (or use your own from Module 5)
+# results_bmi_train: ExWAS results for BMI in training data
+# results_bmi_test: ExWAS results for BMI in testing data
+# results_glu_train: ExWAS results for glucose in training data
+# results_glu_test: ExWAS results for glucose in testing data
+
+load('../data/nh.Rdata')  # for ExposureDescription
+```
+
+## The Volcano Plot
+
+A **volcano plot** displays both statistical significance and effect size:
+
+- **x-axis**: effect estimate (association size)
+- **y-axis**: $-\log_{10}(\text{FDR})$
+- Points above the significance line are FDR-significant
+- Points far from zero have large effects
+
+## Building a Volcano Plot
+
+```{r volcano-basic, fig.width=7, fig.height=4}
+results_bmi_train <- results_bmi_train %>%
+  left_join(ExposureDescription, by = c("exposure" = "var"))
+
+ggplot(results_bmi_train, aes(x = estimate, y = -log10(fdr))) +
+  geom_point(aes(color = fdr < 0.05), alpha = 0.7) +
+  geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "red") +
+  scale_color_manual(values = c("grey60", "steelblue"),
+                     labels = c("Not significant", "FDR < 0.05")) +
+  labs(x = "Effect Estimate (per 1 SD change in log-exposure)",
+       y = expression(-log[10](FDR)),
+       title = "Volcano Plot: ExWAS for BMI",
+       color = "") +
+  theme_minimal()
+```
+
+## Adding Labels with ggrepel
+
+```{r volcano-labeled, fig.width=8, fig.height=4.5}
+# Label the top hits
+top_hits <- results_bmi_train %>%
+  filter(fdr < 0.05) %>%
+  arrange(fdr) %>%
+  head(10)
+
+ggplot(results_bmi_train, aes(x = estimate, y = -log10(fdr))) +
+  geom_point(aes(color = fdr < 0.05), alpha = 0.6) +
+  geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "red") +
+  geom_text_repel(data = top_hits, aes(label = var_desc),
+                  size = 2.5, max.overlaps = 15) +
+  scale_color_manual(values = c("grey60", "steelblue")) +
+  labs(x = "Effect Estimate", y = expression(-log[10](FDR)),
+       title = "Volcano Plot: ExWAS for BMI") +
+  theme_minimal() + theme(legend.position = "none")
+```
+
+## Volcano Plot for Glucose
+
+```{r volcano-glucose, fig.width=8, fig.height=4.5}
+results_glu_train <- results_glu_train %>%
+  left_join(ExposureDescription, by = c("exposure" = "var"))
+
+top_glu <- results_glu_train %>%
+  filter(fdr < 0.05) %>% arrange(fdr) %>% head(10)
+
+ggplot(results_glu_train, aes(x = estimate, y = -log10(fdr))) +
+  geom_point(aes(color = fdr < 0.05), alpha = 0.6) +
+  geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "red") +
+  geom_text_repel(data = top_glu, aes(label = var_desc),
+                  size = 2.5, max.overlaps = 15) +
+  scale_color_manual(values = c("grey60", "coral")) +
+  labs(x = "Effect Estimate", y = expression(-log[10](FDR)),
+       title = "Volcano Plot: ExWAS for Fasting Glucose") +
+  theme_minimal() + theme(legend.position = "none")
+```
+
+## Interpreting Effect Sizes
+
+The estimate from our ExWAS model represents:
+
+> The change in the **standardized phenotype** per **1 SD change** in the log-transformed exposure, adjusted for confounders.
+
+Example: An estimate of 0.10 for lead on BMI means:
+- A 1 SD increase in log(lead) is associated with a 0.10 SD increase in BMI
+- Both variables are on the same scale, making comparisons across exposures valid
+
+## Delta R-Squared: Unique Variance Explained
+
+$\Delta R^2 = R^2_{\text{full model}} - R^2_{\text{base model (covariates only)}}$
+
+```{r delta-r2-calc}
+# Compute delta R2 for each exposure
+r2_base <- summary(lm(BMXBMI ~ RIDAGEYR + RIAGENDR +
+                      factor(RIDRETH1) + INDFMPIR,
+                      data = NHData.train))$r.squared
+
+results_bmi_train <- results_bmi_train %>%
+  mutate(delta_r2 = r.squared - r2_base)
+```
+
+## Visualizing Delta R-Squared
+
+```{r delta-r2-plot, fig.width=8, fig.height=4.5}
+top_r2 <- results_bmi_train %>%
+  filter(fdr < 0.05) %>%
+  arrange(-abs(delta_r2)) %>%
+  head(15)
+
+ggplot(top_r2, aes(x = reorder(var_desc, delta_r2), y = delta_r2)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(x = "", y = expression(Delta~R^2),
+       title = "Unique Variance Explained by Each Exposure (BMI)") +
+  theme_minimal()
+```
+
+## Replication Analysis
+
+Recall our replication criteria from Module 5:
+
+1. **FDR < 0.05** in training data
+2. **p < 0.05** in testing data
+3. **Same direction** of effect in both datasets
+
+## Replication Table
+
+```{r replication-table}
+replication_bmi <- results_bmi_train %>%
+  filter(fdr < 0.05) %>%
+  select(exposure, var_desc, est_train = estimate, fdr_train = fdr) %>%
+  inner_join(
+    results_bmi_test %>%
+      select(exposure, est_test = estimate, p_test = p.value),
+    by = "exposure"
+  ) %>%
+  mutate(
+    concordant = sign(est_train) == sign(est_test),
+    replicated = p_test < 0.05 & concordant
+  )
+
+replication_bmi %>%
+  select(var_desc, est_train, est_test, fdr_train, p_test, replicated) %>%
+  arrange(fdr_train) %>%
+  kable(digits = 4) %>% kable_styling(font_size = 8)
+```
+
+## Replication Summary
+
+```{r replication-summary}
+replication_bmi %>%
+  summarize(
+    discoveries = n(),
+    replicated = sum(replicated),
+    pct_replicated = mean(replicated) * 100
+  ) %>%
+  kable(digits = 1) %>% kable_styling()
+```
+
+## Exposure Correlation Heatmap
+
+Exposures are often correlated. Visualizing this helps interpret co-significant findings:
+
+```{r correlation-matrix, fig.width=7, fig.height=5}
+# Select top FDR-significant exposures
+sig_exposures <- results_bmi_train %>%
+  filter(fdr < 0.05) %>%
+  pull(exposure)
+
+# Compute correlation matrix
+cor_matrix <- NHData.train %>%
+  select(any_of(sig_exposures)) %>%
+  mutate(across(everything(), ~ log(. + 0.001))) %>%
+  cor(use = "pairwise.complete.obs")
+```
+
+## Plotting the Heatmap
+
+```{r heatmap-plot, fig.width=7, fig.height=5}
+cor_long <- cor_matrix %>%
+  as.data.frame() %>%
+  rownames_to_column("var1") %>%
+  pivot_longer(-var1, names_to = "var2", values_to = "correlation")
+
+ggplot(cor_long, aes(x = var1, y = var2, fill = correlation)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "blue", mid = "white", high = "red",
+                       midpoint = 0, limits = c(-1, 1)) +
+  labs(title = "Correlation Among Significant Exposures") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 6),
+        axis.text.y = element_text(size = 6),
+        axis.title = element_blank())
+```
+
+## Sensitivity Across Adjustment Models
+
+Does the association hold under different covariate sets?
+
+```{r sensitivity-setup}
+library(nhanespewas)
+con <- connect_pewas_data()
+
+# Run lead-BMI association under all 7 adjustment models
+sensitivity_results <- map_dfr(1:7, function(i) {
+  tryCatch({
+    result <- pe_flex_adjust("BMXBMI", "LBXBPB",
+                            adjustment_models[[i]], con)
+    result %>%
+      map_dfr(~ tidy(.), .id = "cycle") %>%
+      filter(grepl("LBXBPB", term)) %>%
+      summarize(adj_model = i, estimate = mean(estimate),
+                p.value = min(p.value))
+  }, error = function(e) {
+    tibble(adj_model = i, estimate = NA_real_, p.value = NA_real_)
+  })
+})
+```
+
+## Visualizing Sensitivity
+
+```{r sensitivity-plot, fig.width=7, fig.height=3.5}
+ggplot(sensitivity_results, aes(x = factor(adj_model), y = estimate)) +
+  geom_point(size = 3) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  labs(x = "Adjustment Model", y = "Effect Estimate",
+       title = "Lead-BMI Association Across Adjustment Models") +
+  theme_minimal()
+```
+
+If the estimate is stable across models, the finding is more robust.
+
+## Reverse Causation
+
+**Problem**: In cross-sectional data like NHANES, we cannot determine temporal order.
+
+- Does the exposure cause the phenotype?
+- Or does the phenotype (or treatment for it) affect the exposure?
+
+Example: Medication use may lower exposure biomarker levels in people who already have the disease.
+
+**Solution**: Longitudinal data, Mendelian randomization (Module 7)
+
+## Selection Bias
+
+**Problem**: Who participates in NHANES?
+
+- Non-institutionalized population only
+- Response rates vary by demographics
+- Healthier individuals may be more likely to participate
+
+Survey weights partially address this, but residual bias is possible.
+
+## Measurement Error
+
+**Problem**: Biomarkers are imperfect proxies of true exposure.
+
+- Single time-point measurement may not reflect chronic exposure
+- Laboratory assay variability
+- Some exposures have short half-lives (hours to days)
+- Measurement error typically biases associations **toward the null**
+
+## The PE Atlas
+
+The **Phenotype-Exposure Atlas** provides pre-computed ExWAS results:
+
+- Website: **pe.exposomeatlas.com**
+- Contains associations across hundreds of phenotypes and exposures
+- Results from multiple NHANES cycles
+- Searchable by phenotype or exposure
+
+```{r pe-atlas, eval=FALSE}
+# The nhanespewas package can also access the atlas
+# See package documentation for atlas query functions
+```
+
+## STROBE-E Reporting
+
+When reporting ExWAS results, follow **STROBE-E** guidelines:
+
+| Item | Description |
+|------|-------------|
+| Study design | Cross-sectional, survey-weighted |
+| Exposures | List all tested, with measurement method |
+| Outcome | Definition and measurement |
+| Covariates | All adjustment variables and rationale |
+| Multiple testing | Method used (FDR, Bonferroni) |
+| Replication | Independent dataset used |
+| Effect sizes | With confidence intervals |
+| Sensitivity analyses | Across adjustment models |
+| Limitations | Reverse causation, confounding, measurement error |
+
+## Association vs. Causation
+
+**ExWAS findings are associations, not causal claims.**
+
+To move toward causation:
+
+1. **Replication** in independent data
+2. **Dose-response** relationship
+3. **Biological plausibility**
+4. **Temporal precedence** (longitudinal data)
+5. **Mendelian randomization** (genetic instruments)
+6. **Negative controls** (Module 7)
+
+## Cleaning Up
+
+```{r cleanup}
+disconnect_pewas_data(con)
+```
+
+## Summary
+
+- **Volcano plots** visualize significance and effect size simultaneously
+- **Delta R-squared** quantifies unique variance explained by each exposure
+- **Replication** in independent data validates discoveries
+- **Correlation heatmaps** reveal co-occurring exposures
+- **Sensitivity analysis** tests robustness across adjustment models
+- Be cautious about **reverse causation**, **selection bias**, and **measurement error**
+- Use **STROBE-E** guidelines for transparent reporting
+
+## What's Next?
+
+**Module 7: Advanced Topics**
+
+- Meta-analysis across NHANES cycles
+- Interaction testing
+- Microbiome-exposome studies
+- Future directions: causal inference, ML, multi-omics

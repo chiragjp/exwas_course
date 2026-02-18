@@ -1,0 +1,122 @@
+# Assignment 1: Confounding, Adjustment, and Interpretation
+
+*Combines: Confounding Audit, Volcano Plot Interpretation, Adjustment Model Puzzle*
+
+## Background
+
+You are given the results of an ExWAS testing 200 exposures against fasting glucose (LBXGLU) in NHANES, adjusted for the standard covariate set (age, sex, race/ethnicity, income). The results include estimates from all 9 adjustment models, a volcano plot, and a correlation matrix among exposures.
+
+Use the provided materials to answer the questions below. This assignment tests your ability to reason about confounding, interpret visualizations, and critically evaluate statistical results — not to write code.
+
+---
+
+## Part 1: The Confounding Audit (35 points)
+
+The table below shows 6 ExWAS hits for fasting glucose. All are FDR-significant (FDR < 0.05) under the fully adjusted model (Model 9: age, age², sex, race/ethnicity, income, education, survey wave).
+
+| # | Exposure | Category | $\beta$ (adjusted) | FDR |
+|---|----------|----------|-------------------|-----|
+| 1 | Blood lead (LBXBPB) | Heavy metal | +0.08 | 0.001 |
+| 2 | Serum cotinine (LBXCOT) | Smoking biomarker | +0.11 | <0.001 |
+| 3 | Serum gamma-tocopherol | Nutrient biomarker | +0.06 | 0.02 |
+| 4 | Urinary bisphenol A (URXBPH) | Plasticizer | +0.05 | 0.04 |
+| 5 | Blood mercury (LBXTHG) | Heavy metal | -0.07 | 0.008 |
+| 6 | Serum trans-beta-carotene | Nutrient biomarker | -0.09 | 0.002 |
+
+For **each** of the 6 exposures:
+
+**(a)** Draw a DAG specific to that exposure-glucose pair. Include at least 3 variables: the exposure, glucose, and at least one confounder. Your DAG should reflect the plausible causal structure — not a generic template. (2 pts each)
+
+**(b)** Identify at least one confounder that the standard covariate set (age, sex, race/ethnicity, income, education) **does not capture**. Explain why it is a confounder (i.e., how it affects both the exposure and glucose). (2 pts each)
+
+**(c)** For **two** of the 6 exposures, predict the direction of bias from the unmeasured confounder you identified: does omitting it bias the estimate toward the null, away from the null, or is the direction ambiguous? Justify your answer using the structure of your DAG. (3 pts each)
+
+---
+
+## Part 2: Interpreting the Volcano Plot (30 points)
+
+You are provided with a volcano plot showing all 200 exposures tested against fasting glucose. The x-axis shows the standardized effect estimate ($\beta$), and the y-axis shows $-\log_{10}(p\text{-value})$. Points are colored by exposure category (heavy metals, smoking biomarkers, nutrients, pesticides, plasticizers, PCBs/organochlorines). Horizontal dashed lines mark the Bonferroni and FDR thresholds.
+
+*[Instructor note: provide the volcano plot as a figure.]*
+
+Answer the following:
+
+**(a)** You notice that 5 PCB congeners (PCB-118, PCB-138, PCB-153, PCB-170, PCB-180) all cluster together in the upper-right quadrant of the volcano plot with similar positive effect estimates ($\beta$ = 0.06-0.09) and all pass the Bonferroni threshold. A student concludes: "Five independent exposures are all associated with glucose — this strongly supports a causal role for PCBs."
+
+Critique this interpretation. In your answer, discuss:
+- What you know about the correlation structure among PCB congeners
+- Whether these represent 5 independent pieces of evidence or something else
+- What the clustering implies about the effective number of tests
+- How you would determine whether one PCB is driving the signal vs. all contributing independently
+(10 pts)
+
+**(b)** Blood mercury (LBXTHG) appears as a significant **negative** association with glucose ($\beta$ = -0.07, FDR = 0.008). A colleague interprets this as "mercury is protective against diabetes."
+
+Provide an alternative explanation that does not invoke a protective biological effect. Consider:
+- What dietary sources contribute to blood mercury levels
+- What confounders might create a spurious negative association
+- Whether this finding is more likely causal or confounded, and why
+(10 pts)
+
+**(c)** Serum gamma-tocopherol ($\beta$ = +0.06, FDR = 0.02) and serum trans-beta-carotene ($\beta$ = -0.09, FDR = 0.002) are both nutrient biomarkers but have **opposite** directions of association with glucose.
+
+Explain why two nutrients might show opposite associations. In your answer, consider:
+- Whether both associations are equally likely to be causal
+- What dietary patterns or behaviors might explain the opposite signs
+- How you would distinguish a true biological effect from confounding by overall diet quality
+(10 pts)
+
+---
+
+## Part 3: The Adjustment Model Puzzle (35 points)
+
+The table below shows the effect estimate ($\beta$) for blood lead (LBXBPB) on fasting glucose across all 9 adjustment models:
+
+| Model | Covariates | $\beta$ | SE | p-value |
+|-------|-----------|---------|------|---------|
+| 1 | Unadjusted | +0.15 | 0.02 | <0.001 |
+| 2 | Age | +0.12 | 0.02 | <0.001 |
+| 3 | Age + sex | +0.12 | 0.02 | <0.001 |
+| 4 | Age + sex + race/ethnicity | +0.10 | 0.02 | <0.001 |
+| 5 | Age + sex + race/ethnicity + income | +0.08 | 0.02 | <0.001 |
+| 6 | Model 5 + education | +0.08 | 0.02 | <0.001 |
+| 7 | Model 6 + survey wave | +0.08 | 0.02 | <0.001 |
+| 8 | Model 7 + BMI | +0.03 | 0.02 | 0.12 |
+| 9 | Model 7 + BMI + smoking status | +0.02 | 0.02 | 0.31 |
+
+**(a)** The estimate drops from +0.15 (unadjusted) to +0.10 (Model 4) when race/ethnicity is added. Explain what this tells you about the relationship between race/ethnicity, lead exposure, and glucose. Use the language of confounding. (5 pts)
+
+**(b)** The estimate is stable across Models 5-7 (+0.08) despite adding income, education, and survey wave. Does this stability mean that the estimate is free of confounding? Why or why not? (5 pts)
+
+**(c)** The estimate drops sharply from +0.08 (Model 7) to +0.03 (Model 8) when BMI is added, and the p-value crosses 0.05. Two students offer different interpretations:
+
+- **Student A**: "BMI is a confounder of the lead-glucose relationship. After proper adjustment, the association disappears — lead does not affect glucose."
+- **Student B**: "BMI is on the causal pathway from lead to glucose (lead → BMI → glucose). Adding BMI blocks the indirect effect, which is why the estimate shrinks. The total effect of lead on glucose is +0.08, and most of it operates through BMI."
+
+For each student's interpretation:
+- Draw the DAG implied by their argument
+- Explain under what conditions their interpretation would be correct
+- Discuss what additional evidence would help you distinguish between the two interpretations
+- Given that the data are **cross-sectional**, which interpretation is more defensible and why?
+(15 pts)
+
+**(d)** Now consider a different exposure: serum cotinine (smoking biomarker). Across all 9 adjustment models, the estimate barely changes ($\beta$ ranges from +0.11 to +0.10). Does this mean the cotinine-glucose association is unconfounded? Provide at least two reasons why stability across adjustment models does **not** guarantee the absence of confounding. (10 pts)
+
+---
+
+## Submission
+
+- Submit as a single PDF
+- Clearly label all parts and sub-parts
+- DAGs may be hand-drawn (photograph) or created with software (e.g., DAGitty, PowerPoint)
+- No code is required for this assignment
+- You may discuss the problems with classmates, but your written answers must be your own
+
+## Grading
+
+| Part | Points | Focus |
+|------|--------|-------|
+| Part 1: Confounding Audit | 35 | DAG quality, confounder identification, bias direction reasoning |
+| Part 2: Volcano Plot | 30 | Critical interpretation, correlation awareness, alternative explanations |
+| Part 3: Adjustment Models | 35 | Understanding of confounding vs. mediation, stability interpretation |
+| **Total** | **100** | |

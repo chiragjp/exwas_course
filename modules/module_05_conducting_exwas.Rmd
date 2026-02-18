@@ -1,0 +1,480 @@
+---
+title: "Module 5: Conducting an ExWAS"
+subtitle: "Conducting Exposome-Wide Association Studies"
+author: "Chirag J Patel"
+output:
+  ioslides_presentation:
+    widescreen: true
+    smaller: true
+    css: styles.css
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, eval = FALSE)
+library(tidyverse)
+library(broom)
+library(survey)
+library(knitr)
+library(kableExtra)
+```
+
+## Overview
+
+This module covers the full ExWAS workflow:
+
+1. ExWAS algorithm design (loop over exposures)
+2. Manual association function (from Module 3)
+3. Using `pe_flex_adjust()` at scale
+4. Error handling with `tryCatch()`
+5. Collecting results into a tibble
+6. FDR correction
+7. Train/test replication
+8. Parallelization with `furrr`
+9. Binary phenotype ExWAS with logistic regression
+
+## The ExWAS Algorithm
+
+For each exposure $E_j$ in the exposure catalog:
+
+1. Retrieve phenotype and exposure data
+2. Check exposure data type (continuous vs. categorical)
+3. Fit survey-weighted regression: $P \sim E_j + \text{covariates}$
+4. Extract coefficient, standard error, p-value
+5. Collect into results table
+6. Apply FDR correction across all exposures
+
+## Recap: The Association Function
+
+From Module 3, our manual association function (using bundled data):
+
+```{r manual-association}
+library(survey)
+load('../data/nh.Rdata')
+
+dsn <- svydesign(ids = ~SDMVPSU, strata = ~SDMVSTRA,
+                 weights = ~WTMEC2YR, nest = TRUE, data = NHData.train)
+
+association <- function(phenotype = "BMXBMI", exposure = "LBXBCD",
+                        covariates = c("RIDAGEYR", "male",
+                                      "black", "mexican",
+                                      "other_hispanic", "other_eth",
+                                      "INDFMPIR"),
+                        dsn) {
+  covariate_string <- paste(covariates, collapse = " + ")
+  mod_string <- sprintf("scale(%s) ~ scale(log(%s + 0.001)) + %s",
+                        phenotype, exposure, covariate_string)
+  mod <- svyglm(as.formula(mod_string), dsn)
+  return(mod)
+}
+```
+
+## Testing the Association Function
+
+```{r test-association}
+# Test: BMI ~ Blood Cadmium
+test_model <- association("BMXBMI", "LBXBCD", dsn = dsn)
+tidy(test_model) %>%
+  kable(digits = 4) %>% kable_styling(font_size = 9)
+```
+
+## Building the ExWAS Loop (Manual Approach)
+
+```{r exwas-loop-manual}
+# ExWAS on BMI using the training data
+results_train <- tibble()
+
+for (exp_var in ExposureList) {
+  result <- tryCatch({
+    mod <- association("BMXBMI", exp_var, dsn = dsn)
+    mod_tidy <- tidy(mod)
+    mod_glance <- glance(mod)
+
+    # Extract the exposure coefficient (2nd row: scale(log(...)))
+    exp_row <- mod_tidy %>%
+      filter(grepl("scale\\(log", term))
+
+    tibble(
+      exposure = exp_var,
+      estimate = exp_row$estimate,
+      std.error = exp_row$std.error,
+      p.value = exp_row$p.value,
+      r.squared = mod_glance$adj.r.squared,
+      n = mod_glance$nobs
+    )
+  }, error = function(e) {
+    tibble(
+      exposure = exp_var,
+      estimate = NA_real_,
+      std.error = NA_real_,
+      p.value = NA_real_,
+      r.squared = NA_real_,
+      n = NA_integer_
+    )
+  })
+
+  results_train <- bind_rows(results_train, result)
+}
+```
+
+## Why tryCatch()?
+
+Some exposures may fail for various reasons:
+
+- Too few non-missing observations
+- Convergence issues in the model
+- Zero variance in the exposure
+
+`tryCatch()` prevents the entire loop from crashing:
+
+```{r trycatch-demo, eval=FALSE}
+tryCatch({
+  # Code that might fail
+  mod <- svyglm(formula, dsn)
+  tidy(mod)
+}, error = function(e) {
+  # Return NA row on failure
+  tibble(estimate = NA, p.value = NA)
+})
+```
+
+## A Cleaner Loop with purrr::map
+
+```{r exwas-purrr}
+run_exwas <- function(exposure_list, phenotype, dsn) {
+  map_dfr(exposure_list, function(exp_var) {
+    tryCatch({
+      mod <- association(phenotype, exp_var, dsn = dsn)
+      mod_tidy <- tidy(mod) %>% filter(grepl("scale\\(log", term))
+      mod_glance <- glance(mod)
+      tibble(
+        exposure = exp_var,
+        estimate = mod_tidy$estimate,
+        std.error = mod_tidy$std.error,
+        p.value = mod_tidy$p.value,
+        r.squared = mod_glance$adj.r.squared,
+        n = mod_glance$nobs
+      )
+    }, error = function(e) {
+      tibble(exposure = exp_var, estimate = NA_real_,
+             std.error = NA_real_, p.value = NA_real_,
+             r.squared = NA_real_, n = NA_integer_)
+    })
+  })
+}
+```
+
+## Running ExWAS on BMI
+
+```{r exwas-bmi}
+# Training set
+results_bmi_train <- run_exwas(ExposureList, "BMXBMI", dsn)
+
+# Testing set
+dsn_test <- svydesign(ids = ~SDMVPSU, strata = ~SDMVSTRA,
+                      weights = ~WTMEC2YR, nest = TRUE, data = NHData.test)
+results_bmi_test <- run_exwas(ExposureList, "BMXBMI", dsn_test)
+```
+
+## Running ExWAS on Glucose
+
+```{r exwas-glucose}
+# Training set
+results_glu_train <- run_exwas(ExposureList, "LBXGLU", dsn)
+
+# Testing set
+results_glu_test <- run_exwas(ExposureList, "LBXGLU", dsn_test)
+```
+
+## FDR Correction
+
+Apply Benjamini-Hochberg FDR to training set p-values:
+
+```{r fdr-correction}
+results_bmi_train <- results_bmi_train %>%
+  filter(!is.na(p.value)) %>%
+  mutate(fdr = p.adjust(p.value, method = "BH"))
+
+results_glu_train <- results_glu_train %>%
+  filter(!is.na(p.value)) %>%
+  mutate(fdr = p.adjust(p.value, method = "BH"))
+```
+
+## Top Hits: BMI
+
+```{r top-bmi}
+results_bmi_train %>%
+  arrange(fdr) %>%
+  head(10) %>%
+  left_join(ExposureDescription, by = c("exposure" = "var")) %>%
+  select(exposure, var_desc, estimate, fdr) %>%
+  kable(digits = 4) %>% kable_styling(font_size = 9)
+```
+
+## Top Hits: Glucose
+
+```{r top-glucose}
+results_glu_train %>%
+  arrange(fdr) %>%
+  head(10) %>%
+  left_join(ExposureDescription, by = c("exposure" = "var")) %>%
+  select(exposure, var_desc, estimate, fdr) %>%
+  kable(digits = 4) %>% kable_styling(font_size = 9)
+```
+
+## Replication Strategy
+
+**Train/test replication** validates findings in independent data:
+
+1. **Discovery** (training set): FDR < 0.05
+2. **Replication** (testing set): p-value < 0.05
+3. **Concordance**: same direction of effect in both sets
+
+This reduces false positives beyond FDR correction alone.
+
+## Implementing Replication
+
+```{r replication}
+# Join training and testing results
+replicated_bmi <- results_bmi_train %>%
+  filter(fdr < 0.05) %>%
+  select(exposure, est_train = estimate, fdr_train = fdr) %>%
+  inner_join(
+    results_bmi_test %>%
+      select(exposure, est_test = estimate, p_test = p.value),
+    by = "exposure"
+  ) %>%
+  filter(
+    p_test < 0.05,                        # significant in test
+    sign(est_train) == sign(est_test)      # concordant direction
+  )
+```
+
+## Replication Results: BMI
+
+```{r replication-results}
+replicated_bmi %>%
+  left_join(ExposureDescription, by = c("exposure" = "var")) %>%
+  select(exposure, var_desc, est_train, est_test, fdr_train, p_test) %>%
+  arrange(fdr_train) %>%
+  kable(digits = 4) %>% kable_styling(font_size = 8)
+```
+
+## Using nhanespewas for ExWAS
+
+Now let's do the same using the `nhanespewas` package with the full database:
+
+```{r nhanespewas-exwas}
+library(nhanespewas)
+con <- connect_pewas_data()
+
+# Get list of exposures from e_catalog
+exposure_vars <- e_catalog$var
+```
+
+## ExWAS with pe_flex_adjust()
+
+```{r pe-flex-loop}
+run_exwas_pewas <- function(exposure_vars, phenotype, adj_model, con) {
+  map_dfr(exposure_vars, function(exp_var) {
+    tryCatch({
+      result <- pe_flex_adjust(
+        phenotype = phenotype,
+        exposure = exp_var,
+        adjustment_model = adj_model,
+        con = con
+      )
+      # Extract results from all cycles
+      result %>%
+        map_dfr(~ tidy(.), .id = "cycle") %>%
+        filter(grepl(exp_var, term)) %>%
+        summarize(
+          exposure = exp_var,
+          estimate = mean(estimate),
+          std.error = mean(std.error),
+          p.value = min(p.value),
+          n_cycles = n()
+        )
+    }, error = function(e) {
+      tibble(exposure = exp_var, estimate = NA_real_,
+             std.error = NA_real_, p.value = NA_real_,
+             n_cycles = NA_integer_)
+    })
+  })
+}
+```
+
+## Running ExWAS with nhanespewas
+
+```{r run-pewas-exwas}
+# Run ExWAS for BMI with adjustment model 4
+results_pewas_bmi <- run_exwas_pewas(
+  exposure_vars = exposure_vars,
+  phenotype = "BMXBMI",
+  adj_model = adjustment_models[[4]],
+  con = con
+)
+
+# Apply FDR
+results_pewas_bmi <- results_pewas_bmi %>%
+  filter(!is.na(p.value)) %>%
+  mutate(fdr = p.adjust(p.value, method = "BH"))
+```
+
+## Parallelization with furrr
+
+For large exposure lists, parallelize the loop:
+
+```{r furrr-setup}
+library(furrr)
+library(future)
+
+# Set up parallel workers
+plan(multisession, workers = 4)
+```
+
+## Parallel ExWAS
+
+```{r furrr-exwas}
+run_exwas_parallel <- function(exposure_list, phenotype, dsn) {
+  future_map_dfr(exposure_list, function(exp_var) {
+    tryCatch({
+      mod <- association(phenotype, exp_var, dsn = dsn)
+      mod_tidy <- tidy(mod) %>% filter(grepl("scale\\(log", term))
+      mod_glance <- glance(mod)
+      tibble(
+        exposure = exp_var,
+        estimate = mod_tidy$estimate,
+        std.error = mod_tidy$std.error,
+        p.value = mod_tidy$p.value,
+        r.squared = mod_glance$adj.r.squared,
+        n = mod_glance$nobs
+      )
+    }, error = function(e) {
+      tibble(exposure = exp_var, estimate = NA_real_,
+             std.error = NA_real_, p.value = NA_real_,
+             r.squared = NA_real_, n = NA_integer_)
+    })
+  }, .options = furrr_options(seed = TRUE))
+}
+```
+
+## Running in Parallel
+
+```{r run-parallel}
+# Run ExWAS in parallel (4 cores)
+results_parallel <- run_exwas_parallel(ExposureList, "BMXBMI", dsn)
+
+# Reset to sequential
+plan(sequential)
+```
+
+The parallel version should be ~3-4x faster with 4 workers.
+
+## Binary Phenotype ExWAS: Logistic Regression
+
+For binary outcomes (e.g., T2D status), use logistic regression:
+
+```{r binary-outcome-setup}
+# Create binary T2D variable (glucose >= 126)
+NHData.train <- NHData.train %>%
+  mutate(t2d = as.integer(LBXGLU >= 126))
+
+# Rebuild design
+dsn <- svydesign(ids = ~SDMVPSU, strata = ~SDMVSTRA,
+                 weights = ~WTMEC2YR, nest = TRUE, data = NHData.train)
+```
+
+## Logistic Association Function
+
+```{r logistic-association}
+logistic_association <- function(outcome = "t2d", exposure = "LBXBCD",
+                                 covariates = c("RIDAGEYR", "RIAGENDR",
+                                               "factor(RIDRETH1)", "INDFMPIR"),
+                                 dsn) {
+  covariate_string <- paste(covariates, collapse = " + ")
+  mod_string <- sprintf("%s ~ scale(log(%s + 0.001)) + %s",
+                        outcome, exposure, covariate_string)
+  mod <- svyglm(as.formula(mod_string), dsn, family = quasibinomial())
+  return(mod)
+}
+```
+
+## Using nhanespewas for Logistic ExWAS
+
+```{r logistic-pewas}
+# nhanespewas provides logistic_e_flex_adjust()
+result_logistic <- logistic_e_flex_adjust(
+  phenotype = "t2d_status",  # binary phenotype variable
+  exposure = "LBXBPB",
+  adjustment_model = adjustment_models[[4]],
+  con = con
+)
+```
+
+## Interpreting Logistic Results
+
+```{r logistic-interpret}
+# Coefficients are log-odds ratios
+# Exponentiate to get odds ratios
+result_logistic %>%
+  map_dfr(~ tidy(.), .id = "cycle") %>%
+  filter(grepl("LBXBPB", term)) %>%
+  mutate(odds_ratio = exp(estimate)) %>%
+  select(cycle, estimate, odds_ratio, p.value) %>%
+  kable(digits = 3) %>% kable_styling()
+```
+
+An OR > 1 means higher exposure is associated with higher odds of the outcome.
+
+## ExWAS Results Summary
+
+After running a full ExWAS, your results tibble should contain:
+
+| Column | Description |
+|--------|-------------|
+| `exposure` | Exposure variable name |
+| `estimate` | Coefficient (per 1 SD change in log-exposure) |
+| `std.error` | Standard error of the estimate |
+| `p.value` | Raw p-value |
+| `fdr` | FDR-corrected p-value |
+| `r.squared` | Model R² |
+| `n` | Sample size |
+
+## Counting Significant Findings
+
+```{r count-significant}
+results_bmi_train %>%
+  summarize(
+    total_tested = n(),
+    bonferroni_sig = sum(p.value < 0.05 / n(), na.rm = TRUE),
+    fdr_sig = sum(fdr < 0.05, na.rm = TRUE),
+    nominal_sig = sum(p.value < 0.05, na.rm = TRUE)
+  ) %>%
+  kable() %>% kable_styling()
+```
+
+## Cleaning Up
+
+```{r cleanup}
+disconnect_pewas_data(con)
+```
+
+## Summary
+
+- The ExWAS **loop** tests each exposure against a phenotype with proper covariates
+- **`tryCatch()`** prevents individual failures from crashing the pipeline
+- **FDR correction** controls false discoveries across all tests
+- **Replication** in independent data adds a second layer of validation
+- **`pe_flex_adjust()`** provides a streamlined interface through `nhanespewas`
+- **Parallelization** with `furrr` speeds up computation
+- **Logistic regression** extends ExWAS to binary outcomes
+
+## What's Next?
+
+**Module 6: Interpreting ExWAS Results**
+
+- Volcano plots and effect size visualization
+- Delta R-squared analysis
+- Replication tables
+- Exposure correlation structure
+- Sensitivity analysis across adjustment models

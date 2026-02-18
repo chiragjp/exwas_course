@@ -1,0 +1,357 @@
+---
+title: "Module 10: Untargeted Exposomics with LC-HRMS"
+subtitle: "Conducting Exposome-Wide Association Studies"
+author: "Chirag J Patel"
+output:
+  ioslides_presentation:
+    widescreen: true
+    smaller: true
+    css: styles.css
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, eval = FALSE)
+library(tidyverse)
+library(broom)
+library(knitr)
+library(kableExtra)
+```
+
+## Overview
+
+This module covers the next frontier of exposome measurement:
+
+1. Limitations of targeted exposure panels
+2. What is LC-HRMS?
+3. What can it measure?
+4. Untargeted vs. targeted exposomics
+5. The annotation challenge
+6. Connecting LC-HRMS to the ExWAS framework
+7. Statistical considerations at massive scale
+8. Open challenges and future directions
+
+## The Measurement Problem
+
+Throughout this course, we have worked with **targeted** NHANES exposure panels:
+
+- ~619 exposures across 10 waves
+- Each analyte requires a **pre-specified assay**
+- Only measures what we already know to look for
+
+But the true chemical exposome is **vastly larger**:
+
+- Estimated **tens of thousands** of chemicals in commercial use
+- Endogenous metabolites, dietary compounds, drugs, microbiome products
+- Transformation products and reactive intermediates
+- Novel chemicals not yet cataloged
+
+**How do we measure what we don't know to look for?**
+
+## What is LC-HRMS?
+
+**Liquid Chromatography-High Resolution Mass Spectrometry** couples two technologies:
+
+**Liquid Chromatography (LC)**
+
+- Separates chemicals in a biological sample (blood, urine) by passing them through a column
+- Different compounds elute at different **retention times** based on their physicochemical properties
+- Common column chemistries: reverse-phase C18, anion exchange (AE), HILIC
+
+**High-Resolution Mass Spectrometry (HRMS)**
+
+- Ionizes eluting molecules and measures their **mass-to-charge ratio (m/z)** with very high accuracy (<5 ppm mass error)
+- Common instruments: Orbitrap, quadrupole time-of-flight (Q-TOF)
+- High resolution distinguishes chemicals with nearly identical nominal masses
+
+## How LC-HRMS Works
+
+The workflow for a single sample:
+
+1. **Extract** chemicals from a biological specimen (blood, serum, urine)
+2. **Inject** extract into the LC column
+3. **Separate** compounds by retention time (minutes)
+4. **Ionize** eluting molecules (electrospray ionization)
+5. **Measure** accurate mass (m/z) at high resolution
+6. **Detect** thousands of **molecular features** (m/z-retention time pairs)
+
+A single LC-HRMS run detects **5,000-20,000+ features** per sample.
+
+Each feature is a potential chemical signal — an endogenous metabolite, an exogenous exposure, a drug, or a transformation product.
+
+## What Can LC-HRMS Measure?
+
+| Category | Examples |
+|----------|---------|
+| **Endogenous metabolites** | Amino acids, lipids, bile acids, acylcarnitines, organic acids, steroids |
+| **Exogenous chemicals** | Pesticides, plasticizers (phthalates, BPA), PFAS, flame retardants, PAHs, heavy metal complexes |
+| **Drugs and their metabolites** | Pharmaceuticals, phase I/II metabolites (glucuronides, sulfates) |
+| **Dietary compounds** | Polyphenols, phytochemicals, food additives, caffeine metabolites |
+| **Microbiome-derived** | TMAO, hippuric acid, p-cresol sulfate, indoles, secondary bile acids |
+| **Adducts** | HSA-Cys34 adducts from reactive electrophiles (oxidative stress, pollutants) |
+
+The key insight: LC-HRMS captures **both** the internal chemical environment (endogenous) and external exposures (exogenous) **simultaneously**.
+
+## The Blood Exposome
+
+Rappaport et al. (2014) defined the **blood exposome** as the totality of chemicals circulating in blood from both endogenous and exogenous sources:
+
+- Chemicals enter the blood from **external sources** (air, water, diet, drugs, occupation)
+- Chemicals also arise from **endogenous processes** (inflammation, oxidative stress, lipid peroxidation, gut microbiome)
+- The blood integrates all sources into a single measurable compartment
+- LC-HRMS can profile this integrated signal in a single analytical run
+
+This "top-down" approach (measure what's in the blood) complements the "bottom-up" approach (measure every external source) used in traditional exposure assessment.
+
+**Reference:** Rappaport SM, Barupal DK, Wishart D, Vineis P, Scalbert A. The blood exposome and its role in discovering causes of disease. *Environ Health Perspect* 2014; 122(8):769-774.
+
+## Untargeted vs. Targeted: A Comparison
+
+| Dimension | Targeted (e.g., NHANES) | Untargeted LC-HRMS |
+|-----------|------------------------|-------------------|
+| **Coverage** | Hundreds of pre-specified chemicals | Thousands of features (known + unknown) |
+| **Selection** | Must know what to measure *a priori* | Agnostic, discovery-based |
+| **Quantification** | Absolute (ng/mL) with reference standards | Semi-quantitative (relative intensity) |
+| **Sensitivity** | Very high for targeted analytes (ppb-ppt) | Lower for trace xenobiotics |
+| **Discovery** | Limited to known chemicals | Can find novel/unexpected exposures |
+| **Annotation** | Known identity | ~80-95% of features are unannotated |
+| **Sample volume** | Large volumes for full panel | Small volumes (< 100 $\mu$L) |
+| **Cost** | Expensive per analyte | Cost-effective per feature |
+
+Targeted and untargeted approaches are **complementary**, not competing.
+
+## The Annotation Challenge
+
+The single biggest bottleneck in untargeted exposomics:
+
+**Only ~5% of detected features are confidently annotated.**
+
+The **Schymanski confidence levels** provide a standardized framework:
+
+| Level | Confidence | Evidence Required |
+|-------|-----------|-------------------|
+| 1 | Confirmed | Reference standard match (RT + MS + MS/MS) |
+| 2 | Probable | Library MS/MS spectral match |
+| 3 | Tentative | Molecular formula, partial structural evidence |
+| 4 | Formula | Unequivocal molecular formula only |
+| 5 | Mass | Exact mass (m/z) only |
+
+Most features in an untargeted run are Level 4-5 — the **"dark matter"** of the exposome.
+
+**Reference:** Schymanski EL, et al. Identifying small molecules via high resolution mass spectrometry: communicating confidence. *Environ Sci Technol* 2014; 48(4):2097-2098.
+
+## Why Dark Matter Matters
+
+The ~80-95% of unannotated features are a mix of:
+
+- **Truly novel** chemicals not in any database
+- **Known chemicals** missing from spectral libraries
+- **Transformation products** (metabolites of metabolites)
+- **Adducts and in-source fragments** (analytical artifacts)
+- **Informatic noise** (false peaks from feature detection algorithms)
+
+This means that an LC-HRMS-based ExWAS may find strong associations with features we **cannot yet identify**.
+
+Strategies to reduce dark matter:
+
+- Expand spectral libraries (MassBank, HMDB, METLIN, mzCloud)
+- Improve computational annotation (SIRIUS, MS-DIAL, GNPS)
+- Use molecular networking to group related unknowns
+
+## Connecting LC-HRMS to ExWAS
+
+The ExWAS framework from Modules 4-5 extends naturally to untargeted data:
+
+```{r lchrms-exwas-concept}
+# Conceptual LC-HRMS ExWAS
+# Instead of ~619 targeted NHANES exposures,
+# we now have ~10,000 LC-HRMS features
+
+features <- colnames(lchrms_matrix)  # m/z_RT feature IDs
+
+results <- map_dfr(features, function(feat) {
+  tryCatch({
+    mod <- svyglm(
+      as.formula(paste("scale(phenotype) ~ scale(", feat, ") + covariates")),
+      design = dsn
+    )
+    tidy(mod) %>% filter(grepl(feat, term)) %>%
+      mutate(feature = feat)
+  }, error = function(e) NULL)
+})
+
+# Apply FDR
+results <- results %>%
+  mutate(fdr = p.adjust(p.value, method = "BH"))
+```
+
+The **same statistical machinery** applies — but the scale changes dramatically.
+
+## The Scale Problem
+
+| Setting | Features tested | Bonferroni threshold |
+|---------|----------------|---------------------|
+| NHANES ExWAS (Module 5) | ~619 | $8 \times 10^{-5}$ |
+| LC-HRMS ExWAS | ~10,000 | $5 \times 10^{-6}$ |
+| LC-HRMS $\times$ multiple phenotypes | ~100,000+ | $5 \times 10^{-7}$ |
+
+With 10,000 features:
+
+- At $\alpha = 0.05$, expect **500 false positives** by chance
+- Many features are **highly correlated** (same compound, different adducts; co-eluting chemicals; shared pathways)
+- Effective number of independent tests is smaller than the total — but hard to estimate
+
+## Statistical Considerations
+
+Key differences from targeted ExWAS:
+
+**1. Feature correlation is extreme**
+
+- In-source fragments, adducts ([M+H]+, [M+Na]+, [M+K]+), and isotope peaks of the same compound are perfectly correlated
+- Co-eluting compounds from the same biological pathway are highly correlated
+- Must account for this when interpreting significance
+
+**2. Semi-quantitative data**
+
+- Relative intensities, not absolute concentrations
+- Log-transformation and scaling (Module 3) still apply
+- But comparability across studies requires careful normalization
+
+**3. Missing data patterns differ**
+
+- Features below the limit of detection are common
+- Missingness may be informative (low abundance $\neq$ zero exposure)
+- Imputation strategies matter more than in targeted panels
+
+## A Practical Workflow
+
+Integrating LC-HRMS with the ExWAS pipeline:
+
+**Step 1: Pre-processing**
+
+- Peak detection and alignment (e.g., XCMS, MS-DIAL, MZmine)
+- Blank subtraction, batch correction, normalization
+- Filter to reproducible features (present in >50% of QC samples)
+
+**Step 2: ExWAS scan**
+
+- Log-transform, scale, apply ExWAS loop (Modules 3-5)
+- FDR correction across all features
+
+**Step 3: Annotation of hits**
+
+- Prioritize significant features for identification
+- Match to spectral databases (Level 1-3 annotation)
+- Use molecular networking to group related unknowns
+
+**Step 4: Validation**
+
+- Replication in independent samples
+- Targeted confirmation of top hits with reference standards
+- Triangulation with targeted NHANES data where available
+
+## Batch Effects: A Critical Challenge
+
+Large-scale LC-HRMS studies run samples across multiple batches:
+
+- **Signal drift** within a batch (instrument sensitivity changes over hours)
+- **Batch-to-batch variation** (column aging, solvent lots, temperature)
+- **Long-term drift** (months between batches in a large cohort)
+
+These systematic variations can **confound biological signals**.
+
+Mitigation strategies:
+
+- **Pooled QC samples** run every 10-20 samples to monitor drift
+- **Reference standardization** (Go, Walker et al. 2015)
+- **Signal normalization**: median fold change, LOESS regression, ComBat
+- **Randomized run order** to decouple batch from biological variables
+
+**Reference:** Go YM, Walker DI, et al. Reference standardization for mass spectrometry and high-resolution metabolomics applications to exposome research. *Toxicol Sci* 2015; 148(2):531-543.
+
+## Scalable Workflows for Population Studies
+
+Moving LC-HRMS from small studies to population-scale cohorts:
+
+Hu, Walker et al. (2021) demonstrated a **scalable single-step extraction** workflow:
+
+- Combined LC-HRMS and GC-HRMS in a single extraction
+- Validated across hundreds of samples
+- Demonstrated reproducibility for population-scale deployment
+- Detected both endogenous metabolites and exogenous chemicals
+
+This is the kind of infrastructure needed to create a "next-generation NHANES" with untargeted exposomics.
+
+**Reference:** Hu X, Walker DI, et al. A scalable workflow to characterize the human exposome. *Nat Commun* 2021; 12:5575.
+
+## What LC-HRMS Has Already Found
+
+Selected findings from untargeted exposome studies:
+
+- **Novel exposure-disease associations** not detectable with targeted panels (e.g., previously unmeasured dietary metabolites associated with cardiovascular risk)
+- **Exposure-metabolite networks** revealing how exogenous chemicals perturb endogenous pathways (Jeong et al., *Sci Rep* 2021)
+- **Occupational exposures** detected in firefighters vs. office workers through differential metabolomic profiles
+- **Environmental chemical mixtures** that co-occur and may have joint effects on health
+
+The discovery potential is the key advantage — finding associations with chemicals we didn't know to measure.
+
+## The Future: Untargeted ExWAS at Scale
+
+Imagine combining the PE Atlas approach (Module 9) with untargeted LC-HRMS:
+
+| Current (NHANES targeted) | Future (LC-HRMS untargeted) |
+|---------------------------|---------------------------|
+| 619 exposures | 10,000-20,000 features |
+| Known chemicals only | Known + unknown chemicals |
+| Pre-specified assays | Discovery-driven |
+| ~120,000 associations | ~3-6 million associations |
+| Targeted replication | Targeted confirmation of unknowns |
+
+The statistical and computational challenges scale accordingly — but the ExWAS framework (Modules 3-7) provides the foundation.
+
+## Key References
+
+**Foundational:**
+
+- Wild CP. Complementing the genome with an "exposome." *Cancer Epidemiol Biomarkers Prev* 2005; 14(8):1847-1850.
+- Rappaport SM, Smith MT. Environment and disease risks. *Science* 2010; 330:460-461.
+- Vermeulen R, Schymanski EL, Barabasi AL, Miller GW. The exposome and health: where chemistry meets biology. *Science* 2020; 367:392-396.
+
+**Methodology:**
+
+- Rappaport SM, et al. The blood exposome and its role in discovering causes of disease. *Environ Health Perspect* 2014; 122(8):769-774.
+- Go YM, Walker DI, et al. Reference standardization for LC-HRMS exposome research. *Toxicol Sci* 2015; 148(2):531-543.
+- Hu X, Walker DI, et al. A scalable workflow to characterize the human exposome. *Nat Commun* 2021; 12:5575.
+
+## Key References (continued)
+
+**Annotation and standards:**
+
+- Schymanski EL, et al. Identifying small molecules via HRMS: communicating confidence. *Environ Sci Technol* 2014; 48(4):2097-2098.
+- Jones DP. Sequencing the exposome: a call to action. *Toxicol Rep* 2016; 3:29-45.
+
+**ExWAS and data science:**
+
+- Patel CJ, Bhattacharya J, Butte AJ. An Environment-Wide Association Study (EWAS) on Type 2 Diabetes Mellitus. *PLoS ONE* 2010; 5(5):e10746.
+- Chung MK, et al. The exposome and exposome-wide association studies. *Exposome* 2024.
+- Patel CJ, et al. Decoding the exposome: data science methodologies and implications in ExWAS. *Exposome* 2024; 4(1):osae001.
+
+## Summary
+
+- **LC-HRMS** enables untargeted measurement of thousands of chemical features in a single sample
+- It captures **endogenous metabolites, exogenous chemicals, drugs, dietary compounds, and microbiome products** simultaneously
+- The **annotation bottleneck** (~80-95% unannotated) is the major challenge
+- The **ExWAS framework** from this course extends directly to untargeted data — same statistics, larger scale
+- **Batch effects** and **semi-quantitative data** require careful pre-processing
+- Untargeted and targeted approaches are **complementary** — targeted validates untargeted discoveries
+- The future of exposome epidemiology lies in combining LC-HRMS measurement with the ExWAS analytical pipeline at population scale
+
+## What's Next?
+
+The tools are in place:
+
+- **nhanespewas** provides the targeted ExWAS infrastructure (Modules 4-9)
+- **LC-HRMS** provides the next-generation measurement platform (this module)
+- **Statistical methods** from Modules 3 and 7 scale to untargeted data
+- **AI agents** (Module 8) can help manage the complexity
+
+The exposome is no longer limited to what we know to measure — LC-HRMS opens the door to discovering the **unknown unknowns** of environmental health.

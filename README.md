@@ -1,0 +1,117 @@
+# Conducting Exposome-Wide Association Studies
+
+**Instructor:** Chirag J Patel
+
+A hands-on course on the design, execution, and interpretation of Exposome-Wide Association Studies (ExWAS) using NHANES data and the [`nhanespewas`](https://github.com/chiragjp/nhanespewas) R package.
+
+February 17. 2026
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+Install the required R packages before the first class:
+
+```r
+source("base_packages.R")
+```
+
+### The `nhanespewas` Package (Modules 4-10)
+
+```r
+devtools::install_github("chiragjp/nhanespewas")
+```
+
+Download the SQLite database from [Figshare](https://doi.org/10.6084/m9.figshare.29182196) and place it in your working directory. See Module 4 for detailed setup instructions.
+
+### Bundled Data (Modules 1-3)
+
+Modules 1-3 use a bundled NHANES dataset (`data/nh.Rdata`) and do not require the `nhanespewas` package or external database.
+
+---
+
+## Modules
+
+| # | Module | Topics | Data Source |
+|---|--------|--------|-------------|
+| 1 | [The Exposome](modules/module_01_exposome_intro.Rmd) | Exposome definition, NHANES overview, E-G-P-D framework, ExWAS concept | `nh.Rdata` |
+| 2 | [R and Tidyverse Foundations](modules/module_02_tidyverse_foundations.Rmd) | Pipe operator, dplyr verbs, ggplot2, broom, `nest_by` | `nh.Rdata` |
+| 3 | [Statistical Foundations](modules/module_03_statistical_foundations.Rmd) | Survey design, `svyglm`, log-transform, Z-score, FDR, DAGs, per-association confounding | `nh.Rdata` |
+| 4 | [The nhanespewas Package](modules/module_04_nhanespewas_setup.Rmd) | Installation, database, catalogs, adjustment models, `pe_flex_adjust()` | `nhanespewas` |
+| 5 | [Conducting an ExWAS](modules/module_05_conducting_exwas.Rmd) | ExWAS loop, `tryCatch`, FDR, replication, parallelization, logistic ExWAS | `nhanespewas` |
+| 6 | [Interpreting Results](modules/module_06_interpreting_results.Rmd) | Volcano plots, delta R-squared, replication tables, sensitivity analysis, STROBE-E | `nhanespewas` |
+| 7 | [Advanced Topics](modules/module_07_advanced_topics.Rmd) | Meta-analysis (UWLS), interaction testing, confounding mitigation (negative controls, MR, triangulation, DML/TMLE) | `nhanespewas` |
+| 8 | [AI Agents in ExWAS](modules/module_08_agents_exwas.Rmd) | AI-assisted analysis, code generation, automated QC, multi-agent workflows, guardrails | Conceptual |
+| 9 | [Putting It All Together](modules/module_09_putting_it_together.Rmd) | The PE Atlas (Patel, Ioannidis, Manrai — *Nature Medicine*), 120K associations, exposome vs. genome, poly-exposure scores | `nhanespewas` |
+| 10 | [Untargeted Exposomics](modules/module_10_untargeted_exposomics.Rmd) | LC-HRMS, blood exposome, annotation challenge, untargeted ExWAS, batch effects | Conceptual |
+
+Rendered slides (HTML) are available in the `modules/` directory.
+
+---
+
+## Assignments
+
+### Homework
+
+| Assignment | Focus | Code Required? |
+|------------|-------|----------------|
+| [Assignment 1: Confounding, Adjustment, and Interpretation](assignments/assignment_01_confounding_and_interpretation.md) | DAGs, volcano plot interpretation, adjustment model reasoning | No |
+| [Assignment 2: Validation and Multiple Testing](assignments/assignment_02_validation_and_multiple_testing.md) | BH-FDR by hand, triangulation design, MR feasibility, negative controls | Minimal |
+
+### Course Project
+
+| | |
+|---|---|
+| [Course Project: Your Own ExWAS](assignments/course_project.md) | Select or derive a phenotype, run a full ExWAS, interpret top hits with exposure-specific DAGs, design a validation strategy |
+
+The project is weighted 70% interpretation, 30% execution. A null result is a valid outcome if interpreted thoughtfully. Use of AI tools is permitted but must be cited.
+
+---
+
+## Directory Structure
+
+```
+exposome_course/
+  README.md                  # This file
+  base_packages.R            # Required R packages
+  modules/
+    module_01-10_*.Rmd       # Source slides (R Markdown)
+    module_01-10_*.html      # Rendered slides (open in browser)
+    styles.css               # Shared CSS (Helvetica Neue)
+  data/
+    nh.Rdata                 # Bundled NHANES data (Modules 1-3)
+  figures/
+    atlas_fig1-7.jpg         # Figures from the PE Atlas paper
+    *.png                    # Tidyverse diagrams
+  assignments/
+    course_project.md        # Term project description
+    assignment_01_*.md       # Homework 1
+    assignment_02_*.md       # Homework 2
+    homework_ideas.md        # Additional assignment concepts
+    answer_keys/             # Instructor-only answer keys
+```
+
+---
+
+## Key References
+
+- Patel CJ, Bhattacharya J, Butte AJ. An Environment-Wide Association Study (EWAS) on Type 2 Diabetes Mellitus. *PLoS ONE* 2010; 5(5):e10746.
+- Patel CJ, et al. A database of human exposomes and phenomes from the US National Health and Nutrition Examination Survey. *Scientific Data* 2016; 3:160096.
+- Patel CJ, Ioannidis JPA, Manrai AK. An atlas of exposome-phenome associations in health and disease risk. *Nature Medicine*, in press.
+- Chung MK, et al. The exposome and exposome-wide association studies. *Exposome* 2024.
+- Munafo MR, Davey Smith G. Robust research needs many lines of evidence. *Nature* 2018; 553:399-401.
+- Vermeulen R, Schymanski EL, Barabasi AL, Miller GW. The exposome and health: where chemistry meets biology. *Science* 2020; 367:392-396.
+
+---
+
+## External Resources
+
+| Resource | Link |
+|----------|------|
+| `nhanespewas` R package | https://github.com/chiragjp/nhanespewas |
+| PE Atlas (interactive) | https://pe.exposomeatlas.com |
+| NHANES (CDC) | https://www.cdc.gov/nchs/nhanes/index.htm |
+| Full cohort database | https://doi.org/10.6084/m9.figshare.29182196 |
+| Summary statistics | https://doi.org/10.6084/m9.figshare.29186171 |

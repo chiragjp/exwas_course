@@ -1,0 +1,42 @@
+/* Custom styles for ExWAS Course - ioslides */
+
+/* Font family: Helvetica Neue with fallbacks */
+* {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif !important;
+}
+
+slides > slide {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+h2 {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif !important;
+}
+
+.title-slide hgroup h1 {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif !important;
+}
+
+.title-slide hgroup h2 {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif !important;
+}
+
+code {
+  font-family: "SF Mono", "Menlo", "Monaco", "Courier New", monospace !important;
+}
+
+pre {
+  font-family: "SF Mono", "Menlo", "Monaco", "Courier New", monospace !important;
+}
+
+/* Constrain images to fit within slide content area */
+slides > slide article img {
+  max-height: 420px;
+  object-fit: contain;
+}
+
+/* For figure slides with captions, leave room for caption text */
+slides > slide article p > img {
+  max-height: 400px;
+  object-fit: contain;
+}

@@ -1,0 +1,309 @@
+---
+title: "Module 1: The Exposome — Motivation, Biology, and NHANES"
+subtitle: "Conducting Exposome-Wide Association Studies"
+author: "Chirag J Patel"
+output:
+  ioslides_presentation:
+    widescreen: true
+    smaller: true
+    css: styles.css
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+```
+
+## Welcome to the Course
+
+**Conducting Exposome-Wide Association Studies (ExWAS)**
+
+- 7-module online course
+- Learn the statistics and biology behind ExWAS
+- Hands-on R programming with real NHANES data
+- Culminates in running and interpreting your own ExWAS
+
+## Course Overview
+
+| Module | Topic |
+|--------|-------|
+| 1 | The Exposome: Motivation, Biology, and NHANES |
+| 2 | R and Tidyverse Foundations |
+| 3 | Statistical Foundations for ExWAS |
+| 4 | The nhanespewas Package |
+| 5 | Conducting an ExWAS |
+| 6 | Interpreting ExWAS Results |
+| 7 | Advanced Topics |
+
+## What is the Exposome?
+
+> "The exposome encompasses the totality of human environmental exposures from conception onwards, complementing the genome."
+>
+> — Christopher Wild, 2005
+
+- The **genome** is the complete set of DNA
+- The **exposome** is the complete set of environmental exposures
+- Together, they shape health and disease
+
+## The E-G-P-D Framework
+
+Our conceptual model links:
+
+- **E**nvironment (exposures): chemicals, nutrients, pollutants, lifestyle
+- **G**enome: inherited genetic variation
+- **P**henotype: measurable traits (BMI, glucose, blood pressure)
+- **D**isease: clinical outcomes (T2D, cardiovascular disease)
+
+$$E + G \rightarrow P \rightarrow D$$
+
+Understanding the exposome means understanding **E** in this framework.
+
+## Why Study the Exposome?
+
+**The rise of chronic disease:**
+
+- Type 2 diabetes prevalence has increased dramatically over the past 40 years
+- Obesity rates have tripled since the 1970s
+- Genetics alone cannot explain these rapid changes
+- Environmental factors — diet, chemicals, lifestyle — are key drivers
+
+CDC Diabetes Atlas: https://www.cdc.gov/diabetes/php/data-research/index.html
+
+## Genetic vs. Environmental Contributions
+
+- Genome-Wide Association Studies (GWAS) have identified hundreds of loci for complex traits
+- Yet GWAS variants typically explain **<20%** of trait heritability
+- The "missing heritability" problem suggests environmental factors play a large role
+- **ExWAS** is the environmental analogue of GWAS
+
+## What is an ExWAS?
+
+**Exposome-Wide Association Study (ExWAS):**
+
+- Systematically test associations between **many** environmental exposures and a health outcome
+- Analogous to GWAS: instead of scanning SNPs, scan exposures
+- Data-driven, hypothesis-generating approach
+
+First described in: **Patel et al. 2010, PLoS ONE**
+
+## ExWAS: The Concept
+
+1. Measure a large panel of environmental exposures (E₁, E₂, ..., Eₘ)
+2. Measure a phenotype or disease outcome (P or D)
+3. Test each exposure-phenotype association individually
+4. Correct for multiple testing
+5. Replicate findings in independent data
+
+## The National Health and Nutrition Examination Survey (NHANES)
+
+- Conducted by the US CDC / National Center for Health Statistics (NCHS)
+- Representative sample of the non-institutionalized US population
+- Continuous since 1999, released in 2-year cycles
+- Combines **interviews**, **physical examinations**, and **laboratory tests**
+
+https://www.cdc.gov/nchs/nhanes/index.htm
+
+## Why NHANES for ExWAS?
+
+- Hundreds of environmental biomarkers measured in blood and urine
+- Linked to health phenotypes (BMI, glucose, lipids, blood pressure)
+- Demographic and socioeconomic data available
+- Survey weights enable nationally representative estimates
+- Publicly available and well-documented
+
+## NHANES Sampling Design
+
+NHANES uses a **complex, multi-stage probability sampling** design:
+
+1. **Primary Sampling Units (PSUs)**: counties or groups of counties
+2. **Strata**: geographic/demographic divisions within PSUs
+3. **Households**: selected within strata
+4. **Individuals**: selected within households
+
+This design requires special statistical methods (Module 3).
+
+## NHANES Survey Cycles
+
+| Cycle | Years | Key Variables |
+|-------|-------|---------------|
+| 1 | 1999-2000 | Core demographics, lab biomarkers |
+| 2 | 2001-2002 | Expanded environmental panel |
+| 3 | 2003-2004 | Continued monitoring |
+| 4 | 2005-2006 | Additional pollutants |
+| ... | ... | Ongoing |
+
+Our training data uses cycles 1-2; testing data uses cycles 3-4.
+
+## Types of Exposures in NHANES
+
+**Biomarkers of environmental exposure:**
+
+- **Metals**: lead (Pb), cadmium (Cd), mercury (Hg)
+- **Persistent organic pollutants**: PCBs, dioxins, pesticides
+- **Volatile organic compounds**: benzene metabolites
+- **Nutrients**: vitamins, minerals, fatty acids
+- **Lifestyle**: cotinine (smoking), caffeine
+
+Measured in **blood** and **urine** samples.
+
+## Let's Load Our Data
+
+```{r load-data}
+load('../data/nh.Rdata')
+```
+
+This `.Rdata` file contains:
+
+- `NHData.train`: training dataset (NHANES 1999-2002)
+- `NHData.test`: testing dataset (NHANES 2003-2006)
+- `ExposureList`: array of exposure variable names
+- `ExposureDescription`: dictionary of exposure variables
+- `demographicVariables`: dictionary of demographic variables
+
+## Exploring the Training Data
+
+```{r data-dimensions}
+dim(NHData.train)
+```
+
+```{r data-columns}
+ncol(NHData.train)
+```
+
+We have **`r nrow(NHData.train)`** individuals and **`r ncol(NHData.train)`** variables in the training set.
+
+## How Many Exposures?
+
+```{r exposure-count}
+length(ExposureList)
+```
+
+We have **`r length(ExposureList)`** environmental exposures to test.
+
+## Exposure Descriptions
+
+```{r exposure-descriptions}
+head(ExposureDescription, 10) %>%
+  kable() %>%
+  kable_styling(font_size = 9)
+```
+
+## Key Phenotypes
+
+Our primary phenotypes related to Type 2 Diabetes:
+
+| Variable | Description | Units |
+|----------|-------------|-------|
+| `BMXBMI` | Body Mass Index | kg/m² |
+| `LBXGLU` | Fasting Blood Glucose | mg/dL |
+
+```{r phenotype-summary}
+NHData.train %>%
+  summarize(
+    mean_bmi = mean(BMXBMI, na.rm = TRUE),
+    sd_bmi = sd(BMXBMI, na.rm = TRUE),
+    mean_glucose = mean(LBXGLU, na.rm = TRUE),
+    sd_glucose = sd(LBXGLU, na.rm = TRUE)
+  ) %>% kable(digits = 2) %>% kable_styling()
+```
+
+## Demographic Variables
+
+```{r demo-vars}
+head(demographicVariables, 10) %>%
+  kable() %>%
+  kable_styling(font_size = 9)
+```
+
+## Key Demographic Variables
+
+| Variable | Description |
+|----------|-------------|
+| `RIDAGEYR` | Age in years |
+| `male` / `female` | Sex (binary indicators) |
+| `white`, `black`, `mexican`, `other_hispanic`, `other_eth` | Race/Ethnicity (binary indicators) |
+| `INDFMPIR` | Income-to-poverty ratio |
+| `SES_LEVEL` | SES tertile (0, 1, 2) |
+| `SDMVPSU` | Primary sampling unit |
+| `SDMVSTRA` | Stratum |
+| `WTMEC2YR` | 2-year survey weight |
+
+## Variable Types in Our Data
+
+```{r variable-types}
+NHData.train %>%
+  select(BMXBMI, LBXGLU, RIDAGEYR, male, black, INDFMPIR) %>%
+  summarize(across(everything(), class)) %>%
+  pivot_longer(everything(), names_to = "variable", values_to = "type") %>%
+  kable() %>% kable_styling()
+```
+
+## Exploring an Exposure: Blood Lead
+
+```{r lead-hist, fig.width=6, fig.height=3.5}
+ggplot(NHData.train, aes(x = LBXBPB)) +
+  geom_histogram(bins = 50, fill = "steelblue", color = "white") +
+  labs(x = "Blood Lead (ug/dL)", y = "Count",
+       title = "Distribution of Blood Lead Levels") +
+  theme_minimal()
+```
+
+## Challenges of Exposome Research
+
+1. **Multiple testing**: hundreds of tests inflate false positives
+2. **Correlation among exposures**: exposures are not independent
+3. **Confounding**: demographic and socioeconomic factors affect both exposure and outcome
+4. **Measurement error**: biomarkers are imperfect proxies of true exposure
+5. **Reverse causation**: disease may affect exposure levels
+6. **Temporal variability**: single time-point measurement
+
+## The Multiple Testing Problem
+
+- Testing `r length(ExposureList)` exposures simultaneously
+- At $\alpha = 0.05$, we expect ~`r round(length(ExposureList) * 0.05)` false positives by chance
+- Solutions:
+  - **Bonferroni correction**: $\alpha / m$ (conservative)
+  - **Benjamini-Hochberg FDR**: controls false discovery rate (less conservative)
+- More detail in Module 3
+
+## Correlation Among Exposures
+
+- Environmental exposures are often correlated
+  - Smokers have higher cadmium AND lead
+  - Dietary nutrients co-occur in food patterns
+  - Pollutants share environmental sources
+- Correlated exposures complicate interpretation
+- Cannot isolate the "causal" exposure from correlated panel
+
+## Confounding
+
+- A **confounder** is a variable that influences both the exposure and the outcome
+- Example: **age** affects both lead levels (older cohorts had more lead exposure) and BMI
+- Must adjust for confounders in regression models
+- Common confounders: age, sex, race/ethnicity, socioeconomic status
+
+## Key References
+
+1. **Wild CP.** Complementing the genome with an "exposome." *Cancer Epidemiol Biomarkers Prev.* 2005.
+2. **Patel CJ, Bhattacharya J, Butte AJ.** An Environment-Wide Association Study (EWAS) on Type 2 Diabetes Mellitus. *PLoS ONE.* 2010.
+3. **Patel CJ, et al.** A database of human exposomes and phenomes from the US NHANES. *Scientific Data.* 2016.
+4. **Chung MK, et al.** The exposome and exposome-wide association studies. *Exposome.* 2024.
+
+## What's Next?
+
+**Module 2: R and Tidyverse Foundations**
+
+- The pipe operator and dplyr verbs
+- Data visualization with ggplot2
+- Linear regression with broom
+- Building pipelines for many regressions
+
+## Summary
+
+- The **exposome** represents the totality of environmental exposures
+- **ExWAS** systematically scans exposures for associations with health outcomes
+- **NHANES** provides a rich, publicly available dataset for ExWAS
+- Key challenges: multiple testing, confounding, correlation, measurement error
+- This course will teach you to conduct, interpret, and extend ExWAS analyses

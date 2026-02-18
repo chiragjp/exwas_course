@@ -1,0 +1,144 @@
+# Assignment 2: Validation Strategy and Multiple Testing
+
+*Combines: Design a Validation Strategy, The Multiple Testing Trap*
+
+## Background
+
+You have completed an ExWAS of 500 exposures against BMI in NHANES (fully adjusted model). Of the 500 exposures tested, 47 are significant at FDR < 0.05 and 18 at the Bonferroni threshold. You are provided with the full results table (exposure, beta, SE, p-value, FDR, exposure category, sample size) and a correlation matrix among the 500 exposures.
+
+---
+
+## Part 1: Multiple Testing Reasoning (40 points)
+
+### 1a. By-hand corrections (10 pts)
+
+The table below shows the 10 smallest p-values from the ExWAS. Compute the following **by hand** (show your work):
+
+| Rank | Exposure | p-value |
+|------|----------|---------|
+| 1 | Serum cotinine | 2.1 $\times 10^{-18}$ |
+| 2 | Urinary NNAL | 8.4 $\times 10^{-14}$ |
+| 3 | Blood cadmium | 3.7 $\times 10^{-11}$ |
+| 4 | Serum gamma-tocopherol | 1.2 $\times 10^{-9}$ |
+| 5 | Blood lead | 5.5 $\times 10^{-8}$ |
+| 6 | Urinary 1-hydroxypyrene | 8.1 $\times 10^{-7}$ |
+| 7 | PCB-153 | 2.3 $\times 10^{-6}$ |
+| 8 | Serum retinyl palmitate | 4.7 $\times 10^{-5}$ |
+| 9 | Urinary mono-ethyl phthalate | 7.8 $\times 10^{-5}$ |
+| 10 | Blood trans-beta-carotene | 1.1 $\times 10^{-4}$ |
+
+**(i)** What is the Bonferroni threshold for 500 tests at $\alpha = 0.05$? Which of the 10 exposures pass it?
+
+**(ii)** Apply the Benjamini-Hochberg procedure step by step for these 10 p-values (using $m = 500$ total tests). Show the BH threshold for each rank ($\frac{k}{m} \cdot \alpha$) and identify which are rejected.
+
+**(iii)** Exposure #10 (trans-beta-carotene, $p = 1.1 \times 10^{-4}$) passes BH-FDR but not Bonferroni. Explain in plain language what this means: what guarantee does each method provide, and why do they disagree here?
+
+### 1b. Correlation and effective tests (15 pts)
+
+Among the 500 exposures, you observe the following correlation structure:
+
+- 42 PCB/organochlorine congeners with pairwise $|r| > 0.6$
+- 15 smoking-related biomarkers with pairwise $|r| > 0.5$
+- 28 phthalate metabolites with pairwise $|r| > 0.4$
+- The remaining ~415 exposures are roughly uncorrelated with each other
+
+**(i)** Estimate the approximate **effective number of independent tests**. Explain your reasoning. There is no single correct answer — describe your assumptions. (5 pts)
+
+**(ii)** If you used this effective number instead of 500 for Bonferroni correction, how would the threshold change? Would any additional exposures from the table in 1a become significant? (5 pts)
+
+**(iii)** The Benjamini-Hochberg FDR procedure assumes independence (or positive regression dependency) among tests. Given the correlation structure described above, is BH-FDR still valid? Would you recommend BH or BY (Benjamini-Yekutieli) FDR for this analysis? Justify your choice. (5 pts)
+
+### 1c. The false positive budget (15 pts)
+
+**(i)** Under the null hypothesis that none of the 500 exposures are truly associated with BMI, how many would you expect to be significant at $p < 0.05$? At $p < 0.001$? (3 pts)
+
+**(ii)** You observe 47 associations at FDR < 0.05. The FDR guarantees that the expected proportion of false discoveries among the 47 is at most 5%. What is the expected **number** of false positives among your 47 hits? (3 pts)
+
+**(iii)** A reviewer argues: "47 hits out of 500 tests is a 9.4% hit rate, which is much higher than the 5% expected by chance. This proves most of your findings are real." Evaluate this argument. Is it correct? What is the flaw, if any? (4 pts)
+
+**(iv)** Another reviewer argues: "Your 18 Bonferroni-significant hits are reliable, but the additional 29 that pass FDR but not Bonferroni are likely false positives." Is this a correct interpretation of the difference between Bonferroni and FDR? Explain what the 29 additional hits represent. (5 pts)
+
+---
+
+## Part 2: Designing a Validation Strategy (60 points)
+
+You will focus on **two** specific ExWAS hits and design a validation strategy for each. The hits are:
+
+**Hit A: Blood cadmium → BMI** ($\beta$ = +0.09, FDR = $3 \times 10^{-8}$, available in 8 NHANES waves)
+
+- Cadmium is a heavy metal found in tobacco smoke, certain foods, and occupational settings
+- The association is positive: higher cadmium is associated with higher BMI
+- The estimate is stable across adjustment models 1-7, but **reverses sign** ($\beta$ = -0.04) when smoking status is added as a covariate (Model 9)
+
+**Hit B: Serum retinyl palmitate → BMI** ($\beta$ = -0.06, FDR = $5 \times 10^{-5}$, available in 4 NHANES waves)
+
+- Retinyl palmitate is a form of vitamin A, obtained primarily from animal-source foods and supplements
+- The association is negative: higher retinyl palmitate is associated with lower BMI
+- The estimate is consistent across all 9 adjustment models
+
+### For Hit A (Blood cadmium → BMI): (30 pts)
+
+**(a) Confounding assessment** (10 pts)
+
+- Draw a DAG for the cadmium-BMI relationship that includes smoking as a variable. Where does smoking sit in the DAG — is it a confounder, a common cause of both cadmium and BMI, or something else?
+- The estimate reverses sign when smoking is added. Interpret this sign reversal: what does it mean biologically, and what does it imply about the unadjusted estimate?
+- After adjusting for smoking, the "true" cadmium-BMI association appears to be weakly **negative**. Propose a biological explanation for why cadmium exposure might be associated with **lower** BMI after removing the smoking-related confounding.
+
+**(b) Triangulation plan** (10 pts)
+
+Design a validation strategy using **at least 3** different approaches from Module 7. For each approach:
+- Name the method
+- Explain specifically how you would apply it to the cadmium-BMI question
+- Identify the key assumption of the method and whether it is likely to hold
+- Discuss what result would strengthen or weaken the causal claim
+
+**(c) Mendelian randomization feasibility** (10 pts)
+
+- What genetic instrument would you need to conduct MR for blood cadmium on BMI?
+- Search your knowledge: has a GWAS been conducted for blood cadmium levels? If so, how many significant loci were identified and in what sample size?
+- If no adequate GWAS exists, discuss why this is the case and what it implies about the feasibility of MR for environmental chemical exposures more broadly
+- Propose an alternative genetic approach or explain why MR may not be applicable here
+
+### For Hit B (Serum retinyl palmitate → BMI): (30 pts)
+
+**(d) Reverse causation** (10 pts)
+
+- In cross-sectional data, could BMI affect retinyl palmitate levels rather than vice versa? Propose a specific biological mechanism for reverse causation.
+- How would you distinguish forward causation (retinyl palmitate → BMI) from reverse causation (BMI → retinyl palmitate) using observational data alone? Is it possible?
+- What study design would definitively resolve the temporal ordering question?
+
+**(e) Negative control analysis** (10 pts)
+
+- Design a negative control analysis for the retinyl palmitate-BMI association.
+- Propose one **negative control exposure**: a variable that should have no biological effect on BMI but shares the same confounding structure as retinyl palmitate. Explain your choice.
+- Propose one **negative control outcome**: a phenotype that should not be affected by retinyl palmitate but would show an association if confounding were present. Explain your choice.
+- If your negative controls show significant associations, what would you conclude about the retinyl palmitate-BMI finding?
+
+**(f) Replication assessment** (10 pts)
+
+- Retinyl palmitate is available in only 4 NHANES waves. Discuss how this affects your confidence in the finding compared to cadmium (8 waves).
+- If the association replicates in 3 of 4 waves with consistent direction but varying magnitude, what does this tell you?
+- If the association replicates in 2 of 4 waves with consistent direction but fails in the other 2, would you still consider it a credible finding? What factors might explain inconsistent replication?
+- Calculate: if the "true" replication rate by chance (no real association) is 5% per wave, what is the probability of replicating in $\geq 3$ of 4 waves by chance? (Use the binomial distribution.)
+
+---
+
+## Submission
+
+- Submit as a single PDF
+- Clearly label all parts and sub-parts
+- Show your work for all calculations (Part 1)
+- DAGs may be hand-drawn or created with software
+- No R code is required, though you may include it for Part 1a calculations if you prefer
+- You may discuss the problems with classmates, but your written answers must be your own
+
+## Grading
+
+| Part | Points | Focus |
+|------|--------|-------|
+| 1a. By-hand corrections | 10 | Correct application of Bonferroni and BH |
+| 1b. Correlation and effective tests | 15 | Reasoning about dependence and its consequences |
+| 1c. False positive budget | 15 | Understanding what FDR and Bonferroni guarantee |
+| 2 (Hit A): Confounding + triangulation + MR | 30 | DAG quality, sign reversal reasoning, MR feasibility |
+| 2 (Hit B): Reverse causation + negative controls + replication | 30 | Causal reasoning, creative negative control design, replication statistics |
+| **Total** | **100** | |

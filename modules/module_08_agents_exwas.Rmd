@@ -1,0 +1,602 @@
+---
+title: "Module 8: AI Agents in the ExWAS Deployment Cycle"
+subtitle: "Conducting Exposome-Wide Association Studies"
+author: "Chirag J Patel"
+output:
+  ioslides_presentation:
+    widescreen: true
+    smaller: true
+    css: styles.css
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, eval = FALSE)
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+```
+
+## Overview
+
+This module explores how AI agents can augment the ExWAS workflow:
+
+1. What are AI agents and how do they differ from chatbots?
+2. The ExWAS deployment cycle — where agents fit
+3. Code generation and pipeline scaffolding
+4. Automated quality control
+5. Literature review and biological plausibility
+6. Result interpretation and reporting
+7. Interactive data exploration
+8. Reproducibility and audit trails
+9. Guardrails — where human judgment remains essential
+
+## What is an AI Agent?
+
+An **AI agent** is a system that can:
+
+- Receive a high-level goal
+- Decompose it into subtasks
+- Execute tools (run code, read files, search the web)
+- Observe results and adapt its plan
+- Iterate until the goal is achieved
+
+Unlike a chatbot (single prompt → single response), agents **take actions** in a loop.
+
+## Examples of AI Agents for Research
+
+| Agent | Capability |
+|-------|------------|
+| **Claude Code** | Reads/writes code, runs shell commands, searches codebases |
+| **GitHub Copilot** | Inline code completion in IDEs |
+| **Notebook agents** | Execute and iterate on computational notebooks |
+| **Literature agents** | Search, retrieve, and synthesize scientific papers |
+
+These tools are rapidly evolving — the patterns matter more than specific products.
+
+## The ExWAS Deployment Cycle
+
+```
+  ┌──────────────┐
+  │  1. Design   │ ← Phenotype, exposure panel, covariates
+  └──────┬───────┘
+         ▼
+  ┌──────────────┐
+  │ 2. Implement │ ← Code the pipeline (R, survey, nhanespewas)
+  └──────┬───────┘
+         ▼
+  ┌──────────────┐
+  │  3. Execute  │ ← Run ExWAS, collect results
+  └──────┬───────┘
+         ▼
+  ┌──────────────┐
+  │ 4. QC & Validate │ ← Check convergence, missingness, replication
+  └──────┬───────┘
+         ▼
+  ┌──────────────┐
+  │ 5. Interpret │ ← Volcano plots, effect sizes, literature context
+  └──────┬───────┘
+         ▼
+  ┌──────────────┐
+  │  6. Report   │ ← STROBE-E, manuscript, dashboards
+  └──────────────┘
+```
+
+## Where Agents Add Value
+
+| Stage | Agent Role | Human Role |
+|-------|-----------|------------|
+| Design | Suggest covariates, find prior ExWAS | Define research question |
+| Implement | Generate pipeline code | Review statistical choices |
+| Execute | Run and monitor jobs | Allocate compute resources |
+| QC | Flag anomalies, check assumptions | Judge acceptability |
+| Interpret | Summarize hits, find literature | Assess causality, clinical meaning |
+| Report | Draft methods sections | Final scientific judgment |
+
+Agents **accelerate** each stage; humans **validate** each stage.
+
+## Stage 1: Study Design with an Agent
+
+An agent can help you design your ExWAS by querying prior work:
+
+```
+You: "I want to run an ExWAS for systolic blood pressure
+      in NHANES. What exposures and covariates should I
+      consider?"
+
+Agent: [searches e_catalog, prior literature]
+  - 163 exposures available across metals, PCBs,
+    phthalates, nutrients, VOCs
+  - Standard covariates: age, sex, race/ethnicity,
+    income, BMI, smoking status
+  - Prior ExWAS (Patel et al. 2010) found lead,
+    cadmium, and gamma-tocopherol associated with BP
+  - Consider: antihypertensive medication use as
+    exclusion criterion or covariate
+```
+
+The agent retrieves context; **you** decide the study design.
+
+## Stage 2: Code Generation
+
+Agents can scaffold the entire ExWAS pipeline from a natural language description:
+
+```
+You: "Write an ExWAS function that tests each exposure
+      in e_catalog against systolic blood pressure,
+      using adjustment model 4, with tryCatch for
+      error handling. Return a tibble with exposure,
+      estimate, SE, p-value, and sample size."
+```
+
+The agent generates code like what we built in Module 5 — but in seconds instead of hours.
+
+## Agent-Generated ExWAS Pipeline
+
+```{r agent-generated-pipeline}
+# An agent might generate this complete pipeline:
+run_exwas <- function(phenotype, exposure_list, adj_model, con) {
+  map_dfr(exposure_list, function(exp_var) {
+    tryCatch({
+      result <- pe_flex_adjust(
+        phenotype = phenotype,
+        exposure = exp_var,
+        adjustment_model = adj_model,
+        con = con
+      )
+      per_cycle <- result %>%
+        map_dfr(~ tidy(.), .id = "cycle") %>%
+        filter(grepl(exp_var, term))
+
+      tibble(
+        exposure = exp_var,
+        estimate = mean(per_cycle$estimate),
+        std.error = mean(per_cycle$std.error),
+        p.value = min(per_cycle$p.value),
+        n_cycles = nrow(per_cycle)
+      )
+    }, error = function(e) {
+      tibble(exposure = exp_var, estimate = NA_real_,
+             std.error = NA_real_, p.value = NA_real_,
+             n_cycles = 0L)
+    })
+  }) %>%
+    filter(!is.na(p.value)) %>%
+    mutate(fdr = p.adjust(p.value, method = "BH"))
+}
+```
+
+## The Agent Advantage: Iteration Speed
+
+Traditional workflow:
+
+1. Write code → run → error → debug → run → error → ...
+2. Each cycle: minutes to hours
+
+Agent-assisted workflow:
+
+1. Describe intent → agent generates code → agent runs it → agent fixes errors → done
+2. Each cycle: seconds to minutes
+
+**Key insight**: Agents don't just write code — they **close the feedback loop** by running it, observing errors, and fixing them autonomously.
+
+## Stage 3: Automated Execution
+
+An agent can manage the full execution:
+
+```
+You: "Run the ExWAS for BMI and glucose against all
+      exposures. Use parallel execution with 4 cores.
+      Save results to results/exwas_bmi.csv and
+      results/exwas_glucose.csv."
+
+Agent: [executes the pipeline]
+  ✓ Connected to nhanespewas database
+  ✓ BMI ExWAS: 163/163 exposures tested (2 failed)
+  ✓ Glucose ExWAS: 163/163 exposures tested (5 failed)
+  ✓ FDR correction applied
+  ✓ Results saved
+
+  Summary:
+  - BMI: 42 exposures with FDR < 0.05
+  - Glucose: 28 exposures with FDR < 0.05
+  - Failed exposures logged to results/errors.log
+```
+
+## Stage 4: Quality Control
+
+Agents can systematically check for common problems:
+
+```
+You: "QC my ExWAS results for BMI."
+
+Agent: [runs checks]
+  ⚠ 3 exposures have n < 500 (low power)
+  ⚠ URXUCD has 68% missingness — interpret with caution
+  ✓ No exposure has estimate > 5 SD (no extreme outliers)
+  ✓ Lambda (genomic inflation) = 1.12 (mild inflation)
+  ⚠ 2 exposure pairs have r > 0.95 (near-collinear):
+    LBXBCD–URXUCD, LBX028–LBX066
+  ✓ Replication rate: 31/42 (74%) replicated in test set
+```
+
+## Automated QC Checks an Agent Could Run
+
+```{r agent-qc-checks}
+qc_exwas_results <- function(results, data) {
+  checks <- list()
+
+  # 1. Sample size check
+  checks$low_n <- results %>%
+    filter(n < 500) %>% pull(exposure)
+
+  # 2. Extreme effect sizes
+  checks$extreme_effects <- results %>%
+    filter(abs(estimate) > 5) %>% pull(exposure)
+
+  # 3. Genomic inflation factor (lambda)
+  chisq <- qchisq(1 - results$p.value, df = 1)
+  checks$lambda <- median(chisq, na.rm = TRUE) /
+    qchisq(0.5, df = 1)
+
+  # 4. Missingness per exposure
+  checks$high_missing <- results %>%
+    filter(n < 0.5 * max(n, na.rm = TRUE)) %>%
+    pull(exposure)
+
+  return(checks)
+}
+```
+
+## Stage 5: Literature-Informed Interpretation
+
+After identifying hits, agents can search for biological context:
+
+```
+You: "My top ExWAS hit for glucose is gamma-tocopherol
+      (LBXGTC). What is known about this association?"
+
+Agent: [searches literature]
+  Gamma-tocopherol is a form of vitamin E found in
+  soybean and corn oils.
+
+  Relevant findings:
+  - Patel et al. 2010: gamma-tocopherol associated
+    with T2D in NHANES ExWAS (replicated)
+  - Montonen et al. 2004: dietary vitamin E inversely
+    associated with T2D risk in Finnish cohort
+  - Possible mechanism: antioxidant protection of
+    pancreatic beta cells
+  - Caveat: gamma-tocopherol is also a marker of
+    dietary fat intake (confounding by diet quality)
+```
+
+## Agent-Assisted Biological Plausibility Assessment
+
+An agent can systematically assess each hit:
+
+| Exposure | Direction | Prior Literature | Mechanism | Plausibility |
+|----------|-----------|-----------------|-----------|-------------|
+| LBXGTC (gamma-tocopherol) | - glucose | 3 prior studies | Antioxidant | Moderate |
+| LBXBPB (lead) | + glucose | Extensive | Beta-cell toxicity | High |
+| LBXBCD (cadmium) | + BMI | 5 prior studies | Endocrine disruption | Moderate |
+| URXMHH (phthalate) | + BMI | Emerging | Adipogenesis | Low-Moderate |
+
+The agent provides the **evidence base**; **you** judge the plausibility.
+
+## Stage 5: Visualization Assistance
+
+Agents can generate publication-ready figures from natural language:
+
+```
+You: "Create a volcano plot for the BMI ExWAS. Label
+      the top 10 hits. Color by exposure category
+      (metals, PCBs, nutrients, etc.). Add a horizontal
+      line at FDR = 0.05."
+```
+
+The agent generates the full ggplot2 code, runs it, and shows the result — iterating on aesthetics based on your feedback.
+
+## Stage 6: Automated Report Drafting
+
+Agents can draft STROBE-E compliant methods sections:
+
+```
+You: "Draft the methods section for our BMI ExWAS."
+
+Agent:
+  "We conducted an exposome-wide association study
+  (ExWAS) examining associations between 163
+  environmental biomarkers and body mass index (BMI)
+  in the National Health and Nutrition Examination
+  Survey (NHANES, 1999-2006). Exposures were
+  log-transformed and standardized to z-scores.
+  Survey-weighted linear regression (svyglm) was
+  used, adjusting for age, sex, race/ethnicity, and
+  income-to-poverty ratio. Multiple testing was
+  controlled using the Benjamini-Hochberg false
+  discovery rate (FDR < 0.05). Findings were
+  replicated in an independent NHANES series
+  (2003-2006) requiring p < 0.05 and concordant
+  effect direction."
+```
+
+## Interactive Exploration with Agents
+
+Instead of writing code to query the PE Atlas, ask in natural language:
+
+```
+You: "What exposures are associated with both BMI and
+      glucose with FDR < 0.05 in our results?"
+
+Agent: [queries results]
+  12 exposures overlap:
+  1. LBXBPB (lead): BMI β=0.08, glucose β=0.12
+  2. LBXGTC (gamma-tocopherol): BMI β=-0.05, glucose β=-0.09
+  3. LBXCOT (cotinine): BMI β=0.11, glucose β=0.07
+  ...
+
+  These shared hits may reflect:
+  a) Common upstream causes (confounding)
+  b) Shared biological pathways (e.g., metabolic syndrome)
+  c) Independent effects on both phenotypes
+
+  Shall I check the correlation structure among these exposures?
+```
+
+## Reproducibility: The Conversation as Audit Trail
+
+A powerful property of agent-assisted research:
+
+**Every analytical decision is documented in the conversation.**
+
+```
+Session log:
+  09:15 - User: "Run ExWAS for BMI, adjustment model 4"
+  09:16 - Agent: [executed pipeline, 163 exposures]
+  09:17 - User: "Also adjust for smoking (LBXCOT)"
+  09:18 - Agent: [re-ran with updated covariates]
+  09:19 - User: "Compare the two models"
+  09:20 - Agent: [generated comparison table]
+  09:21 - User: "The cotinine-adjusted model makes
+                  more biological sense. Use that."
+```
+
+The conversation **is** the lab notebook.
+
+## Agent Workflow: End-to-End ExWAS
+
+```{r agent-workflow-concept}
+# Conceptual: an agent executing a full ExWAS session
+#
+# 1. Agent connects to database
+# con <- connect_pewas_data()
+#
+# 2. Agent identifies available exposures for the phenotype
+# exposures <- e_catalog %>% filter(analyzable == 1) %>% pull(var)
+#
+# 3. Agent runs ExWAS with error handling
+# results <- run_exwas(phenotype, exposures, adj_model, con)
+#
+# 4. Agent performs QC
+# qc <- qc_exwas_results(results, data)
+#
+# 5. Agent generates volcano plot
+# plot <- make_volcano_plot(results)
+#
+# 6. Agent runs replication
+# replicated <- replicate_findings(results_train, results_test)
+#
+# 7. Agent searches literature for top hits
+# lit_review <- search_literature(replicated$exposure)
+#
+# 8. Agent drafts summary report
+# report <- draft_strobe_e(results, replicated, lit_review)
+```
+
+## Multi-Agent Architectures
+
+Future ExWAS deployments may use **multiple specialized agents**:
+
+```
+  ┌─────────────────┐
+  │ Orchestrator    │ ← Coordinates the workflow
+  │ Agent           │
+  └───┬────┬────┬───┘
+      │    │    │
+      ▼    ▼    ▼
+  ┌─────┐┌─────┐┌─────┐
+  │Stats ││Lit  ││Viz  │
+  │Agent ││Agent││Agent│
+  └─────┘└─────┘└─────┘
+```
+
+- **Stats Agent**: Runs regressions, meta-analyses, sensitivity checks
+- **Literature Agent**: Searches PubMed, summarizes prior findings
+- **Visualization Agent**: Generates plots, dashboards, interactive figures
+
+## Agents for Sensitivity Analysis
+
+An agent can systematically test robustness:
+
+```
+You: "Run a sensitivity analysis for all FDR-significant
+      hits across all 9 adjustment models."
+
+Agent: [runs 42 exposures × 9 models = 378 analyses]
+
+  Robust findings (significant in ≥7/9 models):
+  - LBXBPB (lead): significant in 9/9 models
+  - LBXCOT (cotinine): significant in 8/9 models
+  - LBXBCD (cadmium): significant in 7/9 models
+
+  Sensitive findings (significant in ≤3/9 models):
+  - URXMHH (phthalate): significant in 2/9 models
+  - LBX074 (PCB 74): significant in 3/9 models
+
+  [generates heatmap of estimates across models]
+```
+
+## Agents for Meta-Analysis
+
+Agents can run cross-cycle meta-analyses at scale:
+
+```
+You: "Meta-analyze all 42 significant exposures across
+      NHANES cycles. Report I² and flag heterogeneous
+      associations."
+
+Agent: [runs 42 meta-analyses]
+
+  High heterogeneity (I² > 75%):
+  - LBXGTC: I²=82%, estimate varies from -0.12 to +0.03
+    → Possible temporal trend in gamma-tocopherol levels
+
+  Low heterogeneity (I² < 25%):
+  - LBXBPB: I²=8%, consistent across all cycles
+    → Robust, stable association
+
+  [generates forest plots for all 42 exposures]
+```
+
+## Guardrails: Where Humans Must Lead
+
+AI agents **cannot** and **should not** replace human judgment for:
+
+| Domain | Why Humans Are Essential |
+|--------|------------------------|
+| **Causal claims** | Agents find associations; causality requires domain expertise |
+| **Clinical interpretation** | What does a 0.1 SD change in BMI mean for a patient? |
+| **Ethical review** | Environmental justice implications, vulnerable populations |
+| **Study design** | Which confounders matter requires biological knowledge |
+| **Novel biology** | Agents summarize known literature; they don't discover mechanisms |
+| **Publication decisions** | What is worth reporting vs. noise |
+
+## Common Agent Pitfalls
+
+Be aware of failure modes:
+
+1. **Hallucinated references**: Agents may cite papers that don't exist — always verify
+2. **Plausible but wrong code**: Code may run without errors but implement the wrong model
+3. **Over-confidence**: Agents present results with certainty even when uncertain
+4. **Context loss**: Long sessions may lose track of earlier decisions
+5. **Reproducibility risk**: Agent behavior may differ across sessions
+
+**Mitigation**: Always review generated code, verify references, and document decisions.
+
+## Best Practices for Agent-Assisted ExWAS
+
+1. **Start with a clear question** — agents work best with well-defined goals
+2. **Review all generated code** — especially statistical model specifications
+3. **Verify literature claims** — check that cited papers exist and say what the agent claims
+4. **Use agents for iteration, not delegation** — you drive the science, agents accelerate it
+5. **Save conversation logs** — they are your reproducibility record
+6. **Test on known results first** — validate agent-generated pipelines against published ExWAS
+7. **Version control everything** — `git commit` after each validated step
+
+## The Human-Agent Team
+
+The most productive model is **human-agent collaboration**:
+
+```
+  Human                          Agent
+  ─────                          ─────
+  Define research question  →
+                            ←    Scaffold pipeline code
+  Review statistical choices →
+                            ←    Execute and QC pipeline
+  Interpret top hits        →
+                            ←    Search literature, generate figures
+  Write discussion          →
+                            ←    Draft methods, format tables
+  Final scientific judgment →
+                            ←    Archive and document
+```
+
+Neither alone is as effective as both together.
+
+## Practical Example: Claude Code for ExWAS
+
+A real interaction pattern with Claude Code:
+
+```
+$ claude
+
+You: Load the nhanespewas database and run an ExWAS
+     for fasting glucose against all exposures in
+     e_catalog, using adjustment model 4. Apply FDR
+     correction and show me the top 10 hits.
+
+Claude: [connects to DB, writes pipeline, executes,
+         shows results table]
+
+You: Now make a volcano plot and label the replicated
+     hits.
+
+Claude: [generates ggplot2 code, renders plot]
+
+You: The x-axis label needs units. Fix it and also
+     add a title.
+
+Claude: [updates plot, re-renders]
+```
+
+## Looking Ahead: Autonomous ExWAS Agents
+
+Near-future capabilities:
+
+- **Scheduled runs**: Agent monitors new NHANES data releases, re-runs ExWAS automatically
+- **Cross-study replication**: Agent searches for replication cohorts and runs validation
+- **Adaptive analysis**: Agent identifies unexpected patterns and proposes follow-up analyses
+- **Real-time dashboards**: Agent maintains a Shiny app that updates with new results
+- **Federated ExWAS**: Agents coordinate analyses across institutions without sharing raw data
+
+## The Exposome Research Stack of the Future
+
+```
+  ┌─────────────────────────────┐
+  │     Researcher Interface    │  Natural language
+  ├─────────────────────────────┤
+  │     AI Agent Layer          │  Claude Code, etc.
+  ├─────────────────────────────┤
+  │     Analysis Framework      │  nhanespewas, R, Python
+  ├─────────────────────────────┤
+  │     Data Infrastructure     │  SQLite, cloud DBs, FHIR
+  ├─────────────────────────────┤
+  │     Cohort Data             │  NHANES, UK Biobank, etc.
+  └─────────────────────────────┘
+```
+
+The agent layer **democratizes** exposome research — a graduate student with an agent can now do what previously required a team of bioinformaticians.
+
+## Responsible Use of AI in Exposome Research
+
+Principles for agent-assisted research:
+
+1. **Transparency**: Disclose AI assistance in publications
+2. **Reproducibility**: Share agent prompts and conversation logs
+3. **Accountability**: The researcher is responsible for the science, not the agent
+4. **Verification**: Independent validation of agent-generated results
+5. **Equity**: Ensure AI tools don't widen the research gap between institutions
+
+## Summary
+
+- AI agents can augment **every stage** of the ExWAS deployment cycle
+- Greatest value: **code generation**, **QC automation**, **literature synthesis**, **reporting**
+- Agents **accelerate** the research loop from days to hours
+- The conversation log serves as a **reproducibility record**
+- **Human judgment remains essential** for causal inference, clinical interpretation, and ethical considerations
+- The human-agent team is more productive than either alone
+- As agents improve, exposome research becomes more accessible to a broader community
+
+## Course Complete
+
+**Congratulations on completing all 8 modules!**
+
+You now have the skills to:
+
+- Design and conduct an ExWAS (Modules 1-5)
+- Interpret and visualize results (Module 6)
+- Apply advanced methods: meta-analysis, interaction testing (Module 7)
+- Leverage AI agents to accelerate your research (Module 8)
+
+The exposome is vast. The tools are ready. Go explore!

@@ -1,0 +1,543 @@
+---
+title: "Module 7: Advanced Topics"
+subtitle: "Conducting Exposome-Wide Association Studies"
+author: "Chirag J Patel"
+output:
+  ioslides_presentation:
+    widescreen: true
+    smaller: true
+    css: styles.css
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, eval = FALSE)
+library(tidyverse)
+library(broom)
+library(survey)
+library(metafor)
+library(knitr)
+library(kableExtra)
+```
+
+## Overview
+
+This module covers advanced ExWAS topics:
+
+**A.** Meta-analysis across NHANES cycles
+
+**B.** Interaction testing
+
+**C.** Microbiome-exposome studies
+
+**D.** Future directions
+
+## Part A: Meta-Analysis Across NHANES Cycles
+
+## Why Meta-Analyze?
+
+- Each NHANES cycle (2 years) has a limited sample size
+- Associations may vary across cycles due to:
+  - Changing exposure levels over time
+  - Demographic shifts
+  - Assay changes
+- **Meta-analysis** pools estimates across cycles for:
+  - Greater statistical power
+  - Assessment of heterogeneity over time
+
+## Strategy: Per-Cycle Estimation
+
+1. Run the ExWAS association **separately** in each NHANES cycle
+2. Collect the estimate and standard error from each cycle
+3. Pool using a meta-analytic model
+4. Assess heterogeneity
+
+## Meta-Analysis with nhanespewas
+
+```{r meta-setup}
+library(nhanespewas)
+con <- connect_pewas_data()
+
+# pe_flex_adjust returns results per cycle
+result <- pe_flex_adjust(
+  phenotype = "BMXBMI",
+  exposure = "LBXBPB",
+  adjustment_model = adjustment_models[[4]],
+  con = con
+)
+
+# Extract per-cycle estimates
+per_cycle <- result %>%
+  map_dfr(~ tidy(.), .id = "cycle") %>%
+  filter(grepl("LBXBPB", term))
+```
+
+## Per-Cycle Estimates
+
+```{r per-cycle-table}
+per_cycle %>%
+  select(cycle, estimate, std.error, p.value) %>%
+  kable(digits = 4) %>% kable_styling()
+```
+
+## The stanley_meta() UWLS Method
+
+The `nhanespewas` package provides `stanley_meta()` using the Unrestricted Weighted Least Squares (UWLS) method:
+
+```{r stanley-meta}
+# UWLS meta-analysis
+meta_result <- stanley_meta(
+  estimates = per_cycle$estimate,
+  standard_errors = per_cycle$std.error
+)
+
+meta_result
+```
+
+UWLS is robust to heterogeneity and does not require distributional assumptions about the random effects.
+
+## DerSimonian-Laird with metafor
+
+Compare with the traditional DerSimonian-Laird random-effects model:
+
+```{r metafor-rma}
+library(metafor)
+
+rma_result <- rma(
+  yi = per_cycle$estimate,
+  sei = per_cycle$std.error,
+  method = "DL"
+)
+
+summary(rma_result)
+```
+
+## Comparing Meta-Analytic Methods
+
+```{r compare-meta}
+tibble(
+  method = c("UWLS (stanley_meta)", "DL (metafor::rma)"),
+  estimate = c(meta_result$estimate, rma_result$b[1]),
+  se = c(meta_result$se, rma_result$se[1]),
+  p.value = c(meta_result$p.value, rma_result$pval[1])
+) %>%
+  kable(digits = 4) %>% kable_styling()
+```
+
+## Forest Plot
+
+Visualize per-cycle estimates and the pooled estimate:
+
+```{r forest-plot, fig.width=7, fig.height=4}
+forest_data <- per_cycle %>%
+  select(cycle, estimate, std.error) %>%
+  mutate(
+    ci_lower = estimate - 1.96 * std.error,
+    ci_upper = estimate + 1.96 * std.error,
+    label = paste0("Cycle ", cycle)
+  )
+
+# Add pooled estimate
+pooled <- tibble(
+  label = "Pooled (DL)",
+  estimate = rma_result$b[1],
+  ci_lower = rma_result$ci.lb,
+  ci_upper = rma_result$ci.ub
+)
+
+forest_data <- bind_rows(
+  forest_data %>% select(label, estimate, ci_lower, ci_upper),
+  pooled
+) %>%
+  mutate(label = fct_inorder(label))
+
+ggplot(forest_data, aes(x = estimate, y = label)) +
+  geom_point(size = 3) +
+  geom_errorbarh(aes(xmin = ci_lower, xmax = ci_upper), height = 0.2) +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  labs(x = "Effect Estimate", y = "", title = "Forest Plot: Lead and BMI") +
+  theme_minimal()
+```
+
+## Heterogeneity Statistics
+
+**I² statistic**: Proportion of variability due to heterogeneity (vs. chance)
+
+- I² = 0%: no heterogeneity
+- I² = 25%: low
+- I² = 50%: moderate
+- I² = 75%: high
+
+**Cochran's Q test**: Tests whether variability exceeds sampling error
+
+```{r heterogeneity}
+tibble(
+  I2 = rma_result$I2,
+  Q = rma_result$QE,
+  Q_pvalue = rma_result$QEp,
+  tau2 = rma_result$tau2
+) %>%
+  kable(digits = 3) %>% kable_styling()
+```
+
+## Stouffer's Method
+
+An alternative to pooling effect sizes is to pool **p-values** using Stouffer's method:
+
+$$Z = \frac{\sum_{i=1}^{k} w_i \cdot \Phi^{-1}(p_i)}{\sqrt{\sum_{i=1}^{k} w_i^2}}$$
+
+```{r stouffer}
+# Weighted Stouffer's method (weight by sqrt(n))
+stouffer_z <- function(pvalues, weights = NULL) {
+  z_scores <- qnorm(1 - pvalues / 2)  # two-sided
+  if (is.null(weights)) weights <- rep(1, length(pvalues))
+  z_combined <- sum(weights * z_scores) / sqrt(sum(weights^2))
+  p_combined <- 2 * (1 - pnorm(abs(z_combined)))
+  return(list(z = z_combined, p = p_combined))
+}
+
+stouffer_result <- stouffer_z(per_cycle$p.value)
+stouffer_result
+```
+
+## Meta-ExWAS: Looping Over All Exposures
+
+```{r meta-exwas-loop}
+run_meta_exwas <- function(exposure_vars, phenotype, adj_model, con) {
+  map_dfr(exposure_vars, function(exp_var) {
+    tryCatch({
+      result <- pe_flex_adjust(phenotype, exp_var, adj_model, con)
+      per_cycle <- result %>%
+        map_dfr(~ tidy(.), .id = "cycle") %>%
+        filter(grepl(exp_var, term))
+
+      if (nrow(per_cycle) < 2) return(NULL)
+
+      rma_fit <- rma(yi = per_cycle$estimate,
+                     sei = per_cycle$std.error, method = "DL")
+      tibble(
+        exposure = exp_var,
+        estimate = rma_fit$b[1],
+        se = rma_fit$se[1],
+        p.value = rma_fit$pval[1],
+        I2 = rma_fit$I2,
+        n_cycles = nrow(per_cycle)
+      )
+    }, error = function(e) NULL)
+  })
+}
+```
+
+## Part B: Interaction Testing
+
+## Interaction Testing
+
+**Question**: Does the exposure-phenotype association differ by a modifier (e.g., sex, race)?
+
+$$P = \beta_0 + \beta_1 E + \beta_2 M + \beta_3 (E \times M) + \text{covariates}$$
+
+$\beta_3$ is the **interaction term** — tests whether the E-P association differs across levels of M.
+
+## Interaction with nhanespewas
+
+```{r interaction-test}
+# Test interaction between lead and sex on BMI
+# Some pe_flex_adjust implementations support interact_with parameter
+result_interaction <- pe_flex_adjust(
+  phenotype = "BMXBMI",
+  exposure = "LBXBPB",
+  adjustment_model = adjustment_models[[4]],
+  con = con,
+  interact_with = "RIAGENDR"
+)
+```
+
+## Wald Test for Interaction
+
+The Wald test assesses whether the interaction term is significantly different from zero:
+
+```{r wald-test}
+# Extract interaction term from the model
+result_interaction %>%
+  map_dfr(~ tidy(.), .id = "cycle") %>%
+  filter(grepl(":", term)) %>%
+  select(cycle, term, estimate, std.error, p.value) %>%
+  kable(digits = 4) %>% kable_styling()
+```
+
+A significant p-value indicates that the lead-BMI association differs between males and females.
+
+## Part C: Microbiome-Exposome Studies
+
+## The Microbiome as an Exposure
+
+The gut microbiome is part of the exposome:
+
+- Shaped by diet, medications, environment
+- Influences metabolism, immunity, disease risk
+- Compositional data requiring special statistical treatment
+
+## CLR Transformation
+
+Microbiome data is **compositional** (proportions sum to 1). The Centered Log-Ratio (CLR) transformation addresses this:
+
+$$\text{CLR}(x_i) = \log\left(\frac{x_i}{\text{geometric mean}(x)}\right)$$
+
+```{r clr-transform}
+# CLR transformation function
+clr_transform <- function(x) {
+  # Replace zeros with small pseudocount
+  x[x == 0] <- 0.5
+  log_x <- log(x)
+  log_x - mean(log_x)
+}
+
+# Example: apply to a row of microbiome abundances
+# abundances <- c(100, 50, 20, 5, 1)
+# clr_transform(abundances)
+```
+
+## Microbiome-ExWAS Approach
+
+1. Obtain microbiome composition data (e.g., 16S rRNA or shotgun metagenomics)
+2. Apply CLR transformation to taxa abundances
+3. Treat each CLR-transformed taxon as an "exposure"
+4. Run ExWAS: phenotype ~ CLR(taxon) + covariates
+5. Correct for multiple testing
+6. Validate in independent cohorts
+
+## Part D: Future Directions
+
+## Causal Inference Methods
+
+Moving from association to causation:
+
+**Mendelian Randomization (MR)**
+
+- Use genetic variants as instruments for exposures
+- If a gene variant affects the exposure and is associated with the outcome, this suggests causality
+- Exploits random assortment of alleles at conception
+
+**Negative Control Exposures**
+
+- Test an exposure known NOT to cause the outcome
+- If it shows an association, indicates residual confounding
+
+## Machine Learning for Mixtures
+
+Exposures occur as **mixtures**, not in isolation:
+
+**LASSO (Least Absolute Shrinkage)**
+
+- Selects the most important exposures from a large panel
+- Handles correlated predictors
+- Identifies sparse models
+
+**BKMR (Bayesian Kernel Machine Regression)**
+
+- Models the joint effect of exposure mixtures
+- Estimates individual and interaction effects
+- Accounts for non-linearity
+
+## LASSO for Exposure Selection
+
+```{r lasso-concept}
+library(glmnet)
+
+# Prepare exposure matrix
+# X <- NHData.train %>%
+#   select(all_of(ExposureList)) %>%
+#   mutate(across(everything(), ~ scale(log(. + 0.001)))) %>%
+#   as.matrix()
+# y <- NHData.train$BMXBMI
+
+# Fit LASSO
+# cv_fit <- cv.glmnet(X, y, alpha = 1)
+# coef(cv_fit, s = "lambda.min")
+```
+
+LASSO selects exposures that independently predict the phenotype, addressing correlation among exposures.
+
+## The Per-Association Confounding Problem
+
+Recall from Module 3: **each exposure-phenotype pair has a different confounding structure**, but ExWAS applies the same covariate set to all tests.
+
+This is arguably the **single biggest methodological challenge** in exposome-wide screening.
+
+| Bias Type | Problem | Example |
+|-----------|---------|---------|
+| Unmeasured confounding | Missing confounder not in the model | Occupational exposure not in NHANES |
+| Over-adjustment | Conditioning on a collider or descendant | Adjusting for BMI when it's on the causal path |
+| Differential confounding | Bias direction/magnitude differs per exposure | Age confounds lead-BMI differently than vitamin D-BMI |
+
+## Mitigation Strategy 1: Negative Controls
+
+**Negative control exposures** and **negative control outcomes** detect residual confounding:
+
+- A **negative control exposure** should have no biological effect on the outcome — if it appears significant, confounding is likely
+- A **negative control outcome** should not be affected by the exposure — significance suggests bias
+
+Example: If lead is associated with both glucose (plausible) and a phenotype with no biological link (implausible), the latter flags confounding.
+
+Lipsitch, Tchetgen Tchetgen, Cohen (2010) introduced this framework for epidemiology.
+
+## Mitigation Strategy 2: Mendelian Randomization
+
+**Mendelian randomization (MR)** uses genetic variants as instrumental variables:
+
+```
+Gene (Z) → Exposure (E) → Phenotype (P)
+              ↑
+         Confounders (C)
+```
+
+Because genotypes are assigned at conception (random with respect to confounders), MR estimates are less susceptible to confounding.
+
+- Requires a strong genetic instrument for the exposure
+- Assumptions: relevance, independence, exclusion restriction
+- Can be applied to ExWAS hits as a second-stage validation
+
+**Key limitation**: For many environmental exposures, **GWAS have not been conducted** or are severely underpowered — making valid genetic instruments hard to find. Unlike well-studied traits (e.g., BMI, lipids), most chemical exposures lack large-scale GWAS, so MR may only be feasible for a small subset of ExWAS hits.
+
+## Mitigation Strategy 3: Multiple Adjustment Models
+
+Already built into `nhanespewas` (Module 4):
+
+- **9 adjustment models** from unadjusted to fully adjusted
+- If an association is **sensitive to covariate choice**, it is more likely confounded
+- If it is **robust across models**, residual confounding is less likely (though not ruled out)
+- The atlas (Module 9) found **15% of associations reversed sign** between models — a direct measure of confounding sensitivity
+
+## Mitigation Strategy 4: Data-Driven Confounder Selection
+
+Emerging methods that select confounders **per association**:
+
+**Double/Debiased Machine Learning (DML)**
+
+- Uses ML (e.g., LASSO, random forest) to flexibly model both the exposure and the outcome as functions of potential confounders
+- Estimates the causal effect after partialing out the ML-predicted confounding
+- Does not require pre-specifying which variables are confounders
+
+**Targeted Maximum Likelihood Estimation (TMLE)**
+
+- Semiparametric method that combines ML-based nuisance estimation with targeted bias correction
+- Provides valid inference even with flexible confounder models
+
+Both approaches allow the confounders to **differ per exposure** without manually specifying each DAG.
+
+## Mitigation Strategy 5: Triangulation
+
+No single method eliminates confounding. **Triangulation** combines evidence from multiple approaches with **different biases**:
+
+| Approach | Bias Profile |
+|----------|-------------|
+| ExWAS (observational) | Unmeasured confounding, reverse causation |
+| Mendelian randomization | Pleiotropy, weak instruments |
+| Negative controls | Detects but doesn't correct bias |
+| Longitudinal studies | Residual confounding, attrition |
+| Cross-population replication | Different confounding structures |
+
+If an association survives across approaches with **different biases**, it is more likely to be real.
+
+**Key references:**
+
+- Munafò MR, Davey Smith G. Robust research needs many lines of evidence. *Nature* 2018; 553:399-401.
+- Lawlor DA, Tilling K, Davey Smith G. Triangulation in aetiological epidemiology. *Int J Epidemiol* 2016; 45(6):1866-1886.
+- Munafò MR, Higgins JPT, Davey Smith G. Triangulating evidence through the inclusion of genetically informed designs. *Cold Spring Harb Perspect Med* 2021; 11:a040659.
+
+## A Two-Stage Workflow
+
+A practical approach that addresses per-association confounding:
+
+**Stage 1 — Screen broadly (ExWAS)**
+
+- Apply uniform covariate set to hundreds of exposures
+- Accept that some findings are confounded
+- Use FDR and replication to reduce false positives
+
+**Stage 2 — Investigate deeply (per-hit)**
+
+- For each top hit, construct an **exposure-specific DAG**
+- Apply targeted methods: MR, negative controls, DML/TMLE
+- Triangulate across methods and populations
+
+This separates **discovery** (broad, practical) from **validation** (rigorous, per-association).
+
+## Multi-Omics Integration
+
+The exposome intersects with other -omics layers:
+
+| Layer | Data Type | Integration |
+|-------|-----------|-------------|
+| Genomics | SNPs, PRS | Gene-environment interaction |
+| Transcriptomics | Gene expression | Exposure response signatures |
+| Metabolomics | Metabolite levels | Intermediate biomarkers of exposure |
+| Proteomics | Protein levels | Biomarkers of exposure |
+| Epigenomics | DNA methylation | Exposure memory |
+
+## Building Shiny Dashboards
+
+Interactive exploration of ExWAS results:
+
+```{r shiny-concept, eval=FALSE}
+library(shiny)
+
+# A Shiny app could allow users to:
+# 1. Select a phenotype
+# 2. Choose adjustment models
+# 3. View interactive volcano plots
+# 4. Explore individual associations
+# 5. Compare across NHANES cycles
+
+# See: https://shiny.rstudio.com/
+```
+
+## Course Recap
+
+| Module | Key Skill |
+|--------|-----------|
+| 1 | Exposome concepts, NHANES structure |
+| 2 | Tidyverse data manipulation and visualization |
+| 3 | Survey-weighted regression, FDR, confounding |
+| 4 | nhanespewas package and database |
+| 5 | Running a full ExWAS pipeline |
+| 6 | Interpreting and visualizing results |
+| 7 | Meta-analysis, interactions, advanced methods |
+
+## Key Takeaways
+
+1. The **exposome** complements the genome in understanding chronic disease
+2. **NHANES** provides a rich, publicly available resource for ExWAS
+3. Proper statistical methods (**survey weighting**, **FDR**, **replication**) are essential
+4. The **nhanespewas** package streamlines the analysis workflow
+5. Always consider **confounding**, **reverse causation**, and **measurement error**
+6. **Meta-analysis** across cycles increases power and assesses heterogeneity
+7. Future directions include **causal inference**, **ML**, and **multi-omics**
+
+## Resources
+
+- **nhanespewas package**: https://github.com/chiragjp/nhanespewas
+- **PE Atlas**: pe.exposomeatlas.com
+- **NHANES**: https://www.cdc.gov/nchs/nhanes/index.htm
+- **Patel et al. 2010**: PLoS ONE, ExWAS for T2D
+- **Patel et al. 2016**: Scientific Data, NHANES exposome database
+- **Chung et al. 2024**: Exposome journal, ExWAS review
+
+## Cleaning Up
+
+```{r cleanup}
+disconnect_pewas_data(con)
+```
+
+## Thank You
+
+**Congratulations on completing the ExWAS course!**
+
+You now have the skills to:
+
+- Design and conduct an ExWAS
+- Interpret and visualize results
+- Replicate and validate findings
+- Apply advanced methods (meta-analysis, interaction testing)
+- Critically evaluate exposome research
+
+Questions? Comments? Reach out!
