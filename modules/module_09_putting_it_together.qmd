@@ -2,10 +2,10 @@
 title: "Module 9: Putting It All Together — An Atlas of the Exposome"
 subtitle: "Conducting Exposome-Wide Association Studies"
 author: "Chirag J Patel"
-output:
-  ioslides_presentation:
-    widescreen: true
+format:
+  revealjs:
     smaller: true
+    scrollable: true
     css: styles.css
 ---
 

@@ -1,4 +1,6 @@
-# Assignment 1: Confounding, Adjustment, and Interpretation
+---
+title: "Assignment 1: Confounding, Adjustment, and Interpretation"
+---
 
 *Combines: Confounding Audit, Volcano Plot Interpretation, Adjustment Model Puzzle*
 

@@ -2,10 +2,10 @@
 title: "Module 10: Untargeted Exposomics with LC-HRMS"
 subtitle: "Conducting Exposome-Wide Association Studies"
 author: "Chirag J Patel"
-output:
-  ioslides_presentation:
-    widescreen: true
+format:
+  revealjs:
     smaller: true
+    scrollable: true
     css: styles.css
 ---
 

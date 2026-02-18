@@ -1,4 +1,6 @@
-# Assignment 2: Validation Strategy and Multiple Testing
+---
+title: "Assignment 2: Validation Strategy and Multiple Testing"
+---
 
 *Combines: Design a Validation Strategy, The Multiple Testing Trap*
 

@@ -1,0 +1,52 @@
+project:
+  type: website
+  output-dir: _site
+  render:
+    - "*.qmd"
+    - "modules/*.qmd"
+    - "assignments/*.qmd"
+    - "!assignments/answer_keys/"
+
+website:
+  title: "Conducting Exposome-Wide Association Studies"
+  navbar:
+    left:
+      - text: Home
+        href: index.qmd
+      - text: Modules
+        menu:
+          - text: "1: The Exposome"
+            href: modules/module_01_exposome_intro.qmd
+          - text: "2: R & Tidyverse Foundations"
+            href: modules/module_02_tidyverse_foundations.qmd
+          - text: "3: Statistical Foundations"
+            href: modules/module_03_statistical_foundations.qmd
+          - text: "4: The nhanespewas Package"
+            href: modules/module_04_nhanespewas_setup.qmd
+          - text: "5: Conducting an ExWAS"
+            href: modules/module_05_conducting_exwas.qmd
+          - text: "6: Interpreting Results"
+            href: modules/module_06_interpreting_results.qmd
+          - text: "7: Advanced Topics"
+            href: modules/module_07_advanced_topics.qmd
+          - text: "8: AI Agents in ExWAS"
+            href: modules/module_08_agents_exwas.qmd
+          - text: "9: Putting It All Together"
+            href: modules/module_09_putting_it_together.qmd
+          - text: "10: Untargeted Exposomics"
+            href: modules/module_10_untargeted_exposomics.qmd
+      - text: Assignments
+        menu:
+          - text: "Assignment 1: Confounding & Interpretation"
+            href: assignments/assignment_01_confounding_and_interpretation.qmd
+          - text: "Assignment 2: Validation & Multiple Testing"
+            href: assignments/assignment_02_validation_and_multiple_testing.qmd
+          - text: "Course Project"
+            href: assignments/course_project.qmd
+
+format:
+  html:
+    theme: cosmo
+    mainfont: "Helvetica Neue, Helvetica, Arial, sans-serif"
+    monofont: "SF Mono, Menlo, Monaco, Courier New, monospace"
+    css: modules/styles.css

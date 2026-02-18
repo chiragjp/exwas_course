@@ -1,4 +1,6 @@
-# Course Project: Your Own Exposome-Wide Association Study
+---
+title: "Course Project: Your Own Exposome-Wide Association Study"
+---
 
 ## Overview
 

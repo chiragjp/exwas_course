@@ -1,42 +1,33 @@
-/* Custom styles for ExWAS Course - ioslides */
+/* Custom styles for ExWAS Course - Reveal.js */
 
 /* Font family: Helvetica Neue with fallbacks */
-* {
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif !important;
-}
-
-slides > slide {
+.reveal {
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 }
 
-h2 {
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif !important;
+.reveal h1,
+.reveal h2,
+.reveal h3,
+.reveal h4 {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 }
 
-.title-slide hgroup h1 {
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif !important;
+.reveal code {
+  font-family: "SF Mono", "Menlo", "Monaco", "Courier New", monospace;
 }
 
-.title-slide hgroup h2 {
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif !important;
-}
-
-code {
-  font-family: "SF Mono", "Menlo", "Monaco", "Courier New", monospace !important;
-}
-
-pre {
-  font-family: "SF Mono", "Menlo", "Monaco", "Courier New", monospace !important;
+.reveal pre {
+  font-family: "SF Mono", "Menlo", "Monaco", "Courier New", monospace;
 }
 
 /* Constrain images to fit within slide content area */
-slides > slide article img {
+.reveal .slides section img {
   max-height: 420px;
   object-fit: contain;
 }
 
 /* For figure slides with captions, leave room for caption text */
-slides > slide article p > img {
+.reveal .slides section p > img {
   max-height: 400px;
   object-fit: contain;
 }
