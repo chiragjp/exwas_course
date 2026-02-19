@@ -2,11 +2,11 @@
 title: "Conducting Exposome-Wide Association Studies"
 ---
 
-**Instructor:** Chirag J Patel
+**Instructor:** [Chirag J Patel](https://chiragjpgroup.org)
 
 A hands-on course on the design, execution, and interpretation of Exposome-Wide Association Studies (ExWAS) using NHANES data and the [`nhanespewas`](https://github.com/chiragjp/nhanespewas) R package.
 
-February 17, 2026
+**Updated:** February 18, 2026 | [GitHub](https://github.com/chiragjp/exwas_course) | [@chiragjp](https://x.com/chiragjp)
 
 ---
 
