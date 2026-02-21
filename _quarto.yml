@@ -9,6 +9,7 @@ project:
 
 website:
   title: "Conducting Exposome-Wide Association Studies"
+  google-analytics: "G-579C2BXWKT"
   navbar:
     left:
       - text: Home
