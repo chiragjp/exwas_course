@@ -1,5 +1,5 @@
 ---
-title: "Module 9: Putting It All Together — An Atlas of the Exposome"
+title: "Module 8: Putting It All Together — An Atlas of the Exposome"
 subtitle: "Conducting Exposome-Wide Association Studies"
 author: "Chirag J Patel"
 format:
@@ -38,7 +38,6 @@ This module walks through a large-scale ExWAS that applies **everything** from M
 | 5 | ExWAS loop | 120K associations with tryCatch |
 | 6 | Volcano plots, replication | Atlas visualization, 10-wave replication |
 | 7 | Meta-analysis, interactions | UWLS meta-analysis across waves |
-| 8 | AI agents | Future automation of atlas updates |
 
 ## The P-ExWAS: Study Design at a Glance
 
@@ -494,8 +493,7 @@ You have all the tools to reproduce, extend, and build on this work.
 | 5 | Building and running the ExWAS loop |
 | 6 | Volcano plots, replication, sensitivity analysis |
 | 7 | Meta-analysis, interactions, advanced methods |
-| 8 | AI agents for accelerating ExWAS |
-| **9** | **Full-scale application: the Phenome-Exposome Atlas** |
+| **8** | **Full-scale application: the Phenome-Exposome Atlas** |
 
 ## The Big Picture
 

@@ -1,5 +1,5 @@
 ---
-title: "Module 10: Untargeted Exposomics with LC-HRMS"
+title: "Module 9: Untargeted Exposomics with LC-HRMS"
 subtitle: "Conducting Exposome-Wide Association Studies"
 author: "Chirag J Patel"
 format:
@@ -296,7 +296,7 @@ The discovery potential is the key advantage — finding associations with chemi
 
 ## The Future: Untargeted ExWAS at Scale
 
-Imagine combining the PE Atlas approach (Module 9) with untargeted LC-HRMS:
+Imagine combining the PE Atlas approach (Module 8) with untargeted LC-HRMS:
 
 | Current (NHANES targeted) | Future (LC-HRMS untargeted) |
 |---------------------------|---------------------------|
@@ -352,6 +352,5 @@ The tools are in place:
 - **nhanespewas** provides the targeted ExWAS infrastructure (Modules 4-9)
 - **LC-HRMS** provides the next-generation measurement platform (this module)
 - **Statistical methods** from Modules 3 and 7 scale to untargeted data
-- **AI agents** (Module 8) can help manage the complexity
 
 The exposome is no longer limited to what we know to measure — LC-HRMS opens the door to discovering the **unknown unknowns** of environmental health.

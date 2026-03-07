@@ -43,9 +43,8 @@ Modules 1-3 use a bundled NHANES dataset (`data/nh.Rdata`) and do not require th
 | 5 | [Conducting an ExWAS](modules/module_05_conducting_exwas.qmd) | ExWAS loop, `tryCatch`, FDR, replication, parallelization, logistic ExWAS | `nhanespewas` |
 | 6 | [Interpreting Results](modules/module_06_interpreting_results.qmd) | Volcano plots, delta R-squared, replication tables, sensitivity analysis, STROBE-E | `nhanespewas` |
 | 7 | [Advanced Topics](modules/module_07_advanced_topics.qmd) | Meta-analysis (UWLS), interaction testing, confounding mitigation (negative controls, MR, triangulation, DML/TMLE) | `nhanespewas` |
-| 8 | [AI Agents in ExWAS](modules/module_08_agents_exwas.qmd) | AI-assisted analysis, code generation, automated QC, multi-agent workflows, guardrails | Conceptual |
-| 9 | [Putting It All Together](modules/module_09_putting_it_together.qmd) | The PE Atlas (Patel, Ioannidis, Manrai — *Nature Medicine*), 120K associations, exposome vs. genome, poly-exposure scores | `nhanespewas` |
-| 10 | [Untargeted Exposomics](modules/module_10_untargeted_exposomics.qmd) | LC-HRMS, blood exposome, annotation challenge, untargeted ExWAS, batch effects | Conceptual |
+| 8 | [Putting It All Together](modules/module_08_putting_it_together.qmd) | The PE Atlas (Patel, Ioannidis, Manrai — *Nature Medicine*), 120K associations, exposome vs. genome, poly-exposure scores | `nhanespewas` |
+| 9 | [Untargeted Exposomics](modules/module_09_untargeted_exposomics.qmd) | LC-HRMS, blood exposome, annotation challenge, untargeted ExWAS, batch effects | Conceptual |
 
 Run `quarto preview` to view the site locally, or visit the published GitHub Pages site.
 

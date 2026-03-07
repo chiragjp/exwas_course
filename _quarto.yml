@@ -30,12 +30,10 @@ website:
             href: modules/module_06_interpreting_results.qmd
           - text: "7: Advanced Topics"
             href: modules/module_07_advanced_topics.qmd
-          - text: "8: AI Agents in ExWAS"
-            href: modules/module_08_agents_exwas.qmd
-          - text: "9: Putting It All Together"
-            href: modules/module_09_putting_it_together.qmd
-          - text: "10: Untargeted Exposomics"
-            href: modules/module_10_untargeted_exposomics.qmd
+          - text: "8: Putting It All Together"
+            href: modules/module_08_putting_it_together.qmd
+          - text: "9: Untargeted Exposomics"
+            href: modules/module_09_untargeted_exposomics.qmd
       - text: Assignments
         menu:
           - text: "Assignment 1: Confounding & Interpretation"
