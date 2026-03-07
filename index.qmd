@@ -2,7 +2,7 @@
 title: "Conducting Exposome-Wide Association Studies"
 ---
 
-**Instructor:** [Chirag J Patel](https://www.chiragjpgroup.org)
+**Instructor:** [Chirag J Patel](https://www.chiragjpgroup.org) | [DBMI Faculty Page](https://dbmi.hms.harvard.edu/people/chirag-patel)
 
 A hands-on course on the design, execution, and interpretation of Exposome-Wide Association Studies (ExWAS) using NHANES data and the [`nhanespewas`](https://github.com/chiragjp/nhanespewas) R package.
 
@@ -89,3 +89,14 @@ The project is weighted 70% interpretation, 30% execution. A null result is a va
 | NHANES (CDC) | <https://www.cdc.gov/nchs/nhanes/index.htm> |
 | Full cohort database | <https://doi.org/10.6084/m9.figshare.29182196> |
 | Summary statistics | <https://doi.org/10.6084/m9.figshare.29186171> |
+
+---
+
+## Supported By
+
+![](figures/HMS_DBMI_Logo.svg){width=300}
+
+This course is supported by the National Institutes of Health (NIH):
+
+- National Institute of Environmental Health Sciences (NIEHS): R01ES032470, U24ES036819
+- National Institute of Diabetes and Digestive and Kidney Diseases (NIDDK): R01DK137993

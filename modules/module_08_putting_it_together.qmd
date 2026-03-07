@@ -514,3 +514,12 @@ Now it's your turn to explore.
 **Reference:**
 
 Patel CJ, Ioannidis JPA, Manrai AK. An atlas of exposome-phenome associations in health and disease risk. *Nature Medicine*, in press. doi: 10.1101/2025.06.05.25329055
+
+## Supported By
+
+![](../figures/HMS_DBMI_Logo.svg){width=300}
+
+This course is supported by the National Institutes of Health (NIH):
+
+- National Institute of Environmental Health Sciences (NIEHS): R01ES032470, U24ES036819
+- National Institute of Diabetes and Digestive and Kidney Diseases (NIDDK): R01DK137993

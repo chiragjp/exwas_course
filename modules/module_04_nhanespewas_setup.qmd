@@ -417,3 +417,12 @@ disconnect_pewas_data(con)
 - FDR correction
 - Replication across NHANES series
 - Parallelization with furrr
+
+## Supported By
+
+![](../figures/HMS_DBMI_Logo.svg){width=300}
+
+This course is supported by the National Institutes of Health (NIH):
+
+- National Institute of Environmental Health Sciences (NIEHS): R01ES032470, U24ES036819
+- National Institute of Diabetes and Digestive and Kidney Diseases (NIDDK): R01DK137993

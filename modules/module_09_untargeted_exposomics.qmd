@@ -354,3 +354,12 @@ The tools are in place:
 - **Statistical methods** from Modules 3 and 7 scale to untargeted data
 
 The exposome is no longer limited to what we know to measure — LC-HRMS opens the door to discovering the **unknown unknowns** of environmental health.
+
+## Supported By
+
+![](../figures/HMS_DBMI_Logo.svg){width=300}
+
+This course is supported by the National Institutes of Health (NIH):
+
+- National Institute of Environmental Health Sciences (NIEHS): R01ES032470, U24ES036819
+- National Institute of Diabetes and Digestive and Kidney Diseases (NIDDK): R01DK137993
